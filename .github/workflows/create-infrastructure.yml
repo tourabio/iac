@@ -3,6 +3,9 @@ name: 'Deploy Infrastructure'
 on:
   workflow_dispatch:
 
+env:
+  ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+
 jobs:
   terraform-plan:
     name: 'Plan'
