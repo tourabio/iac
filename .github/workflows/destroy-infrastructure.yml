@@ -1,0 +1,67 @@
+name: 'Destroy Infrastructure'
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "destroy" to confirm destruction'
+        required: true
+        type: string
+
+env:
+  ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+  ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+  ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+
+jobs:
+  terraform-destroy:
+    name: 'Destroy'
+    runs-on: ubuntu-latest
+    if: github.event.inputs.confirm == 'destroy'
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+
+    - name: Terraform Init
+      run: terraform init
+
+    - name: Terraform Plan Destroy
+      run: |
+        terraform plan -destroy -no-color \
+          -var="subscription_id=${{ secrets.ARM_SUBSCRIPTION_ID }}"
+
+    - name: Show Destroy Plan
+      run: |
+        echo "## Terraform Destroy Plan" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        terraform plan -destroy -no-color \
+          -var="subscription_id=${{ secrets.ARM_SUBSCRIPTION_ID }}" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+
+    - name: Terraform Destroy
+      run: |
+        terraform destroy -auto-approve \
+          -var="subscription_id=${{ secrets.ARM_SUBSCRIPTION_ID }}"
+
+    - name: Destruction Summary
+      run: |
+        echo "## 🗑️ Infrastructure Destroyed Successfully!" >> $GITHUB_STEP_SUMMARY
+        echo "All resources have been removed from Azure." >> $GITHUB_STEP_SUMMARY
+
+  confirmation-failed:
+    name: 'Confirmation Failed'
+    runs-on: ubuntu-latest
+    if: github.event.inputs.confirm != 'destroy'
+    
+    steps:
+    - name: Show Error
+      run: |
+        echo "## ❌ Destruction Cancelled" >> $GITHUB_STEP_SUMMARY
+        echo "You must type 'destroy' to confirm infrastructure destruction." >> $GITHUB_STEP_SUMMARY
+        echo "Provided: '${{ github.event.inputs.confirm }}'" >> $GITHUB_STEP_SUMMARY
+        exit 1
