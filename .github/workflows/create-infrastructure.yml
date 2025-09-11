@@ -1,17 +1,73 @@
-name: 'Deploy Infrastructure'
+name: '🚀 Deploy Infrastructure'
 
 on:
   workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
 
 env:
+  ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+  ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+  ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
   ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+  TF_VAR_subscription_id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+  TF_VAR_environment: ${{ inputs.environment }}
 
 jobs:
-  terraform-plan:
-    name: 'Plan'
+  # ============================================================================
+  # VALIDATION AND SECURITY CHECKS
+  # ============================================================================
+  validate:
+    name: '🔍 Validate'
     runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: 1.5.0
+
+    - name: Terraform Format Check
+      run: |
+        cd infrastructure
+        terraform fmt -check -recursive
+      continue-on-error: true
+
+    - name: Terraform Init
+      run: |
+        cd infrastructure
+        terraform init -backend=false
+
+    - name: Terraform Validate
+      run: |
+        cd infrastructure
+        terraform validate
+
+    - name: Security Scan with tfsec
+      uses: aquasecurity/tfsec-action@v1.0.0
+      with:
+        soft_fail: true
+
+  # ============================================================================
+  # INFRASTRUCTURE PLANNING
+  # ============================================================================
+  terraform-plan:
+    name: '📋 Plan'
+    runs-on: ubuntu-latest
+    needs: validate
     outputs:
       tfplanExitCode: ${{ steps.tf-plan.outputs.exitcode }}
+      planSummary: ${{ steps.plan-summary.outputs.summary }}
     
     steps:
     - name: Checkout
@@ -19,46 +75,118 @@ jobs:
 
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: 1.5.0
+
+    - name: Cache Terraform
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.terraform.d/plugin-cache
+          .terraform
+        key: terraform-${{ runner.os }}-${{ hashFiles('**/.terraform.lock.hcl') }}
+        restore-keys: |
+          terraform-${{ runner.os }}-
 
     - name: Terraform Init
-      run: terraform init
+      run: |
+        cd infrastructure
+        terraform init
+        echo "✅ Terraform initialized successfully" >> $GITHUB_STEP_SUMMARY
 
     - name: Terraform Plan
       id: tf-plan
       run: |
+        cd infrastructure
         export exitcode=0
         terraform plan -detailed-exitcode -no-color -out tfplan \
-          -var="subscription_id=${{ secrets.ARM_SUBSCRIPTION_ID }}" \
+          -var-file="environments/${{ inputs.environment }}/terraform.tfvars" \
           || export exitcode=$?
 
         echo "exitcode=$exitcode" >> $GITHUB_OUTPUT
         
         if [ $exitcode -eq 1 ]; then
-          echo "Terraform Plan Failed!"
+          echo "❌ Terraform Plan Failed!" >> $GITHUB_STEP_SUMMARY
           exit 1
-        else 
-          exit 0
+        elif [ $exitcode -eq 2 ]; then
+          echo "📝 Changes detected in plan" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "✅ No changes detected" >> $GITHUB_STEP_SUMMARY
         fi
+        
+        exit 0
+
+    - name: Generate Plan Summary
+      id: plan-summary
+      if: steps.tf-plan.outputs.exitcode == 2
+      run: |
+        SUMMARY=$(terraform show -no-color tfplan | head -50)
+        echo "summary<<EOF" >> $GITHUB_OUTPUT
+        echo "$SUMMARY" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
 
     - name: Publish Terraform Plan
+      if: steps.tf-plan.outputs.exitcode == 2
       uses: actions/upload-artifact@v4
       with:
-        name: tfplan
+        name: tfplan-${{ github.run_number }}
         path: tfplan
+        retention-days: 30
 
     - name: Show Plan Summary
+      if: steps.tf-plan.outputs.exitcode == 2
       run: |
-        echo "## Terraform Plan Summary" >> $GITHUB_STEP_SUMMARY
-        echo '```' >> $GITHUB_STEP_SUMMARY
-        terraform show -no-color tfplan >> $GITHUB_STEP_SUMMARY
+        echo "## 📋 Terraform Plan Summary" >> $GITHUB_STEP_SUMMARY
+        echo "**Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Run Number:** ${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo '```terraform' >> $GITHUB_STEP_SUMMARY
+        terraform show -no-color tfplan | head -100 >> $GITHUB_STEP_SUMMARY
         echo '```' >> $GITHUB_STEP_SUMMARY
 
+    - name: Comment PR
+      if: github.event_name == 'pull_request' && steps.tf-plan.outputs.exitcode == 2
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const plan = `${{ steps.plan-summary.outputs.summary }}`;
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: `## 📋 Terraform Plan\n\`\`\`terraform\n${plan}\n\`\`\``
+          });
+
+  # ============================================================================
+  # MANUAL APPROVAL
+  # ============================================================================
+  approve-deployment:
+    name: '✋ Approve Deployment'
+    runs-on: ubuntu-latest
+    needs: [terraform-plan]
+    if: needs.terraform-plan.outputs.tfplanExitCode == 2
+    environment: 
+      name: approval-${{ inputs.environment }}
+      
+    steps:
+    - name: Manual Approval Required
+      run: |
+        echo "## ✋ Manual Approval Required" >> $GITHUB_STEP_SUMMARY
+        echo "**Environment**: ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Requested by**: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "Please review the Terraform plan above and approve this deployment." >> $GITHUB_STEP_SUMMARY
+        echo "The infrastructure changes will be applied after approval." >> $GITHUB_STEP_SUMMARY
+
+  # ============================================================================
+  # INFRASTRUCTURE DEPLOYMENT
+  # ============================================================================
   terraform-apply:
-    name: 'Apply'
+    name: '🚀 Apply'
     if: needs.terraform-plan.outputs.tfplanExitCode == 2
     runs-on: ubuntu-latest
     environment: production
-    needs: [terraform-plan]
+    needs: [validate, terraform-plan, approve-deployment]
     
     steps:
     - name: Checkout
@@ -66,6 +194,18 @@ jobs:
 
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: 1.5.0
+
+    - name: Cache Terraform
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.terraform.d/plugin-cache
+          .terraform
+        key: terraform-${{ runner.os }}-${{ hashFiles('**/.terraform.lock.hcl') }}
+        restore-keys: |
+          terraform-${{ runner.os }}-
 
     - name: Terraform Init
       run: terraform init
@@ -73,15 +213,93 @@ jobs:
     - name: Download Terraform Plan
       uses: actions/download-artifact@v4
       with:
-        name: tfplan
+        name: tfplan-${{ github.run_number }}
+
+    - name: Verify Plan Before Apply
+      run: |
+        echo "## 🔍 Verifying Plan Before Apply" >> $GITHUB_STEP_SUMMARY
+        terraform show -no-color tfplan | head -20 >> $GITHUB_STEP_SUMMARY
 
     - name: Terraform Apply
-      run: terraform apply -auto-approve tfplan
+      id: apply
+      run: |
+        echo "Starting infrastructure deployment..."
+        terraform apply -auto-approve tfplan
+        
+        if [ $? -eq 0 ]; then
+          echo "apply_success=true" >> $GITHUB_OUTPUT
+          echo "✅ Apply completed successfully" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "apply_success=false" >> $GITHUB_OUTPUT
+          echo "❌ Apply failed" >> $GITHUB_STEP_SUMMARY
+          exit 1
+        fi
 
-    - name: Show Outputs
+    - name: Generate Outputs
+      if: steps.apply.outputs.apply_success == 'true'
+      id: outputs
+      run: |
+        echo "rg_name=$(terraform output -raw resource_group_name)" >> $GITHUB_OUTPUT
+        echo "acr_name=$(terraform output -raw acr_name)" >> $GITHUB_OUTPUT
+        echo "acr_server=$(terraform output -raw acr_login_server)" >> $GITHUB_OUTPUT
+        echo "acr_id=$(terraform output -raw acr_id)" >> $GITHUB_OUTPUT
+
+    - name: Show Deployment Summary
+      if: steps.apply.outputs.apply_success == 'true'
       run: |
         echo "## 🚀 Infrastructure Deployed Successfully!" >> $GITHUB_STEP_SUMMARY
-        echo "### Resources Created:" >> $GITHUB_STEP_SUMMARY
-        echo "- **Resource Group**: $(terraform output -raw resource_group_name)" >> $GITHUB_STEP_SUMMARY
-        echo "- **ACR Name**: $(terraform output -raw acr_name)" >> $GITHUB_STEP_SUMMARY
-        echo "- **ACR Login Server**: $(terraform output -raw acr_login_server)" >> $GITHUB_STEP_SUMMARY
+        echo "**Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Deployed at:** $(date -u)" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📦 Resources Created:" >> $GITHUB_STEP_SUMMARY
+        echo "- **Resource Group**: ${{ steps.outputs.outputs.rg_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **ACR Name**: ${{ steps.outputs.outputs.acr_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **ACR Login Server**: ${{ steps.outputs.outputs.acr_server }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **ACR Resource ID**: ${{ steps.outputs.outputs.acr_id }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🔗 Next Steps:" >> $GITHUB_STEP_SUMMARY
+        echo "- Configure container image builds" >> $GITHUB_STEP_SUMMARY
+        echo "- Set up deployment pipelines" >> $GITHUB_STEP_SUMMARY
+        echo "- Configure access policies if needed" >> $GITHUB_STEP_SUMMARY
+
+    - name: Create GitHub Release
+      if: steps.apply.outputs.apply_success == 'true' && inputs.environment == 'prod'
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: deploy-${{ github.run_number }}
+        release_name: Production Deployment ${{ github.run_number }}
+        body: |
+          ## 🚀 Production Infrastructure Deployment
+          
+          **ACR Name**: ${{ steps.outputs.outputs.acr_name }}
+          **ACR Server**: ${{ steps.outputs.outputs.acr_server }}
+          **Resource Group**: ${{ steps.outputs.outputs.rg_name }}
+          
+          Deployed on: $(date -u)
+        draft: false
+        prerelease: false
+
+  # ============================================================================
+  # POST-DEPLOYMENT NOTIFICATIONS
+  # ============================================================================
+  notify:
+    name: '📬 Notify'
+    runs-on: ubuntu-latest
+    needs: [terraform-apply]
+    if: always()
+    
+    steps:
+    - name: Deployment Status
+      run: |
+        if [ "${{ needs.terraform-apply.result }}" == "success" ]; then
+          echo "## ✅ Deployment Completed Successfully" >> $GITHUB_STEP_SUMMARY
+          echo "Infrastructure has been deployed to **${{ inputs.environment }}** environment." >> $GITHUB_STEP_SUMMARY
+        elif [ "${{ needs.terraform-apply.result }}" == "failure" ]; then
+          echo "## ❌ Deployment Failed" >> $GITHUB_STEP_SUMMARY
+          echo "Please check the logs and retry the deployment." >> $GITHUB_STEP_SUMMARY
+        elif [ "${{ needs.terraform-apply.result }}" == "cancelled" ]; then
+          echo "## ⏹️ Deployment Cancelled" >> $GITHUB_STEP_SUMMARY
+          echo "The deployment was cancelled by user." >> $GITHUB_STEP_SUMMARY
+        fi

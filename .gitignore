@@ -32,7 +32,9 @@ override.tf.json
 # !example_override.tf
 
 # Include tfplan files to ignore the plan output of command: terraform plan -out=tfplan
-# example: *tfplan*
+*tfplan*
+tfplan
+*.tfplan
 
 # IntelliJ
 .idea
@@ -63,3 +65,25 @@ nb-configuration.xml
 
 # TLS Certificates
 .certs/
+
+# Terraform lock files (keep in version control but ignore if conflicts)
+# .terraform.lock.hcl
+
+# GitHub Actions artifacts and temporary files
+destruction-archive/
+pre-destroy-outputs.json
+destroy-plan.txt
+*.log
+
+# Backup files
+*.backup
+*~
+
+# Environment-specific files (if containing secrets)
+# Note: Our environment tfvars are safe to commit as they don't contain secrets
+# Uncomment if you add secret values to environment configs:
+# infrastructure/environments/*/secrets.tfvars
+
+# Temporary files
+*.tmp
+*.temp

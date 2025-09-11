@@ -1,4 +1,4 @@
-name: 'Destroy Infrastructure'
+name: '🗑️ Destroy Infrastructure'
 
 on:
   workflow_dispatch:
@@ -7,15 +7,39 @@ on:
         description: 'Type "destroy" to confirm destruction'
         required: true
         type: string
+      environment:
+        description: 'Environment to destroy'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+      reason:
+        description: 'Reason for destruction (optional)'
+        required: false
+        type: string
 
 env:
+  ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+  ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+  ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
   ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+  TF_VAR_subscription_id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+  TF_VAR_environment: ${{ inputs.environment }}
 
 jobs:
-  terraform-destroy:
-    name: 'Destroy'
+  # ============================================================================
+  # PRE-DESTRUCTION VALIDATION
+  # ============================================================================
+  validate-destruction:
+    name: '⚠️ Validate'
     runs-on: ubuntu-latest
     if: github.event.inputs.confirm == 'destroy'
+    outputs:
+      resources_exist: ${{ steps.check-resources.outputs.exist }}
+      resource_count: ${{ steps.check-resources.outputs.count }}
     
     steps:
     - name: Checkout
@@ -23,35 +47,179 @@ jobs:
 
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: 1.5.0
 
     - name: Terraform Init
-      run: terraform init
+      run: |
+        cd infrastructure
+        terraform init
+
+    - name: Check Current Resources
+      id: check-resources
+      run: |
+        # Get current state resources
+        RESOURCE_COUNT=$(terraform show -json | jq '.values.root_module.resources | length' 2>/dev/null || echo "0")
+        echo "count=$RESOURCE_COUNT" >> $GITHUB_OUTPUT
+        
+        if [ "$RESOURCE_COUNT" -gt "0" ]; then
+          echo "exist=true" >> $GITHUB_OUTPUT
+          echo "## ⚠️ Resources Found" >> $GITHUB_STEP_SUMMARY
+          echo "Found $RESOURCE_COUNT resources that will be destroyed." >> $GITHUB_STEP_SUMMARY
+        else
+          echo "exist=false" >> $GITHUB_OUTPUT
+          echo "## ℹ️ No Resources Found" >> $GITHUB_STEP_SUMMARY
+          echo "No resources found in current state." >> $GITHUB_STEP_SUMMARY
+        fi
+
+    - name: Generate Destroy Plan
+      if: steps.check-resources.outputs.exist == 'true'
+      run: |
+        echo "## 🔍 Destroy Plan Preview" >> $GITHUB_STEP_SUMMARY
+        echo "**Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Reason:** ${{ inputs.reason || 'Not specified' }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo '```terraform' >> $GITHUB_STEP_SUMMARY
+        cd infrastructure && terraform plan -destroy -no-color \
+          -var-file="environments/${{ inputs.environment }}/terraform.tfvars" | head -50 >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+
+  # ============================================================================
+  # INFRASTRUCTURE DESTRUCTION
+  # ============================================================================
+  terraform-destroy:
+    name: '🗑️ Destroy'
+    runs-on: ubuntu-latest
+    needs: validate-destruction
+    if: github.event.inputs.confirm == 'destroy' && needs.validate-destruction.outputs.resources_exist == 'true'
+    environment: destruction
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: 1.5.0
+
+    - name: Cache Terraform
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.terraform.d/plugin-cache
+          .terraform
+        key: terraform-${{ runner.os }}-${{ hashFiles('**/.terraform.lock.hcl') }}
+        restore-keys: |
+          terraform-${{ runner.os }}-
+
+    - name: Terraform Init
+      run: |
+        cd infrastructure
+        terraform init
+
+    - name: Pre-Destruction Backup
+      run: |
+        # Backup current state
+        cp terraform.tfstate terraform.tfstate.backup.$(date +%Y%m%d-%H%M%S) 2>/dev/null || echo "No state file to backup"
+        
+        # Export current outputs for reference
+        echo "## 📋 Resources Before Destruction" >> $GITHUB_STEP_SUMMARY
+        terraform output -json > pre-destroy-outputs.json 2>/dev/null || echo "{}" > pre-destroy-outputs.json
+        
+        if [ -s pre-destroy-outputs.json ] && [ "$(cat pre-destroy-outputs.json)" != "{}" ]; then
+          echo "**Resource Group**: $(terraform output -raw resource_group_name 2>/dev/null || echo 'N/A')" >> $GITHUB_STEP_SUMMARY
+          echo "**ACR Name**: $(terraform output -raw acr_name 2>/dev/null || echo 'N/A')" >> $GITHUB_STEP_SUMMARY
+          echo "**ACR Server**: $(terraform output -raw acr_login_server 2>/dev/null || echo 'N/A')" >> $GITHUB_STEP_SUMMARY
+        fi
 
     - name: Terraform Plan Destroy
       run: |
-        terraform plan -destroy -no-color \
-          -var="subscription_id=${{ secrets.ARM_SUBSCRIPTION_ID }}"
+        echo "## 🔍 Final Destroy Plan" >> $GITHUB_STEP_SUMMARY
+        echo '```terraform' >> $GITHUB_STEP_SUMMARY
+        cd infrastructure && terraform plan -destroy -no-color \
+          -var-file="environments/${{ inputs.environment }}/terraform.tfvars" | tee destroy-plan.txt
+        cat destroy-plan.txt >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
 
-    - name: Show Destroy Plan
+    - name: Wait for Final Confirmation
       run: |
-        echo "## Terraform Destroy Plan" >> $GITHUB_STEP_SUMMARY
-        echo '```' >> $GITHUB_STEP_SUMMARY
-        terraform plan -destroy -no-color \
-          -var="subscription_id=${{ secrets.ARM_SUBSCRIPTION_ID }}" >> $GITHUB_STEP_SUMMARY
-        echo '```' >> $GITHUB_STEP_SUMMARY
+        echo "## ⏳ Proceeding with Destruction in 10 seconds..." >> $GITHUB_STEP_SUMMARY
+        echo "**Environment**: ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Resource Count**: ${{ needs.validate-destruction.outputs.resource_count }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Initiated by**: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Timestamp**: $(date -u)" >> $GITHUB_STEP_SUMMARY
+        sleep 10
 
     - name: Terraform Destroy
+      id: destroy
       run: |
-        terraform destroy -auto-approve \
-          -var="subscription_id=${{ secrets.ARM_SUBSCRIPTION_ID }}"
+        echo "🗑️ Starting infrastructure destruction..."
+        cd infrastructure && terraform destroy -auto-approve \
+          -var-file="environments/${{ inputs.environment }}/terraform.tfvars"
+        
+        if [ $? -eq 0 ]; then
+          echo "destroy_success=true" >> $GITHUB_OUTPUT
+          echo "✅ Destruction completed successfully" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "destroy_success=false" >> $GITHUB_OUTPUT
+          echo "❌ Destruction failed" >> $GITHUB_STEP_SUMMARY
+          exit 1
+        fi
 
-    - name: Destruction Summary
+    - name: Verify Destruction
+      if: steps.destroy.outputs.destroy_success == 'true'
       run: |
-        echo "## 🗑️ Infrastructure Destroyed Successfully!" >> $GITHUB_STEP_SUMMARY
-        echo "All resources have been removed from Azure." >> $GITHUB_STEP_SUMMARY
+        # Verify no resources remain
+        REMAINING=$(terraform show -json 2>/dev/null | jq '.values.root_module.resources | length' 2>/dev/null || echo "0")
+        
+        if [ "$REMAINING" -eq "0" ]; then
+          echo "## ✅ Destruction Verified" >> $GITHUB_STEP_SUMMARY
+          echo "All resources have been successfully removed." >> $GITHUB_STEP_SUMMARY
+        else
+          echo "## ⚠️ Partial Destruction" >> $GITHUB_STEP_SUMMARY
+          echo "$REMAINING resources may still exist. Manual cleanup may be required." >> $GITHUB_STEP_SUMMARY
+        fi
+
+    - name: Cleanup State Files
+      if: steps.destroy.outputs.destroy_success == 'true'
+      run: |
+        # Archive state files
+        mkdir -p destruction-archive
+        cp terraform.tfstate* destruction-archive/ 2>/dev/null || true
+        cp pre-destroy-outputs.json destruction-archive/ 2>/dev/null || true
+        
+        echo "## 📁 Cleanup Complete" >> $GITHUB_STEP_SUMMARY
+        echo "State files have been archived." >> $GITHUB_STEP_SUMMARY
+
+    - name: Upload Destruction Artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: destruction-${{ github.run_number }}
+        path: |
+          destruction-archive/
+          destroy-plan.txt
+        retention-days: 90
+
+  # ============================================================================
+  # EDGE CASES AND ERROR HANDLING
+  # ============================================================================
+  no-resources:
+    name: '📭 No Resources'
+    runs-on: ubuntu-latest
+    needs: validate-destruction
+    if: github.event.inputs.confirm == 'destroy' && needs.validate-destruction.outputs.resources_exist == 'false'
+    
+    steps:
+    - name: No Action Required
+      run: |
+        echo "## 📭 No Resources to Destroy" >> $GITHUB_STEP_SUMMARY
+        echo "The Terraform state contains no resources to destroy." >> $GITHUB_STEP_SUMMARY
+        echo "**Environment**: ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
 
   confirmation-failed:
-    name: 'Confirmation Failed'
+    name: '❌ Invalid Confirmation'
     runs-on: ubuntu-latest
     if: github.event.inputs.confirm != 'destroy'
     
@@ -59,6 +227,37 @@ jobs:
     - name: Show Error
       run: |
         echo "## ❌ Destruction Cancelled" >> $GITHUB_STEP_SUMMARY
-        echo "You must type 'destroy' to confirm infrastructure destruction." >> $GITHUB_STEP_SUMMARY
-        echo "Provided: '${{ github.event.inputs.confirm }}'" >> $GITHUB_STEP_SUMMARY
+        echo "**Required**: 'destroy'" >> $GITHUB_STEP_SUMMARY
+        echo "**Provided**: '${{ github.event.inputs.confirm }}'" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "To proceed with destruction, you must:" >> $GITHUB_STEP_SUMMARY
+        echo "1. Re-run this workflow" >> $GITHUB_STEP_SUMMARY
+        echo "2. Type exactly 'destroy' in the confirmation field" >> $GITHUB_STEP_SUMMARY
+        echo "3. Select the correct environment" >> $GITHUB_STEP_SUMMARY
         exit 1
+
+  # ============================================================================
+  # POST-DESTRUCTION NOTIFICATIONS
+  # ============================================================================
+  notify-completion:
+    name: '📬 Notify'
+    runs-on: ubuntu-latest
+    needs: [terraform-destroy, no-resources]
+    if: always() && github.event.inputs.confirm == 'destroy'
+    
+    steps:
+    - name: Destruction Status
+      run: |
+        if [ "${{ needs.terraform-destroy.result }}" == "success" ]; then
+          echo "## 🗑️ Infrastructure Destroyed Successfully" >> $GITHUB_STEP_SUMMARY
+          echo "All resources in **${{ inputs.environment }}** environment have been removed." >> $GITHUB_STEP_SUMMARY
+          echo "**Destroyed by**: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Timestamp**: $(date -u)" >> $GITHUB_STEP_SUMMARY
+          echo "**Reason**: ${{ inputs.reason || 'Not specified' }}" >> $GITHUB_STEP_SUMMARY
+        elif [ "${{ needs.terraform-destroy.result }}" == "failure" ]; then
+          echo "## ❌ Destruction Failed" >> $GITHUB_STEP_SUMMARY
+          echo "Some resources may still exist. Please check the logs and perform manual cleanup if necessary." >> $GITHUB_STEP_SUMMARY
+        elif [ "${{ needs.no-resources.result }}" == "success" ]; then
+          echo "## 📭 No Action Required" >> $GITHUB_STEP_SUMMARY
+          echo "No resources were found to destroy in **${{ inputs.environment }}** environment." >> $GITHUB_STEP_SUMMARY
+        fi
