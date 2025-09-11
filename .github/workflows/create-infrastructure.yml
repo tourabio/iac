@@ -98,12 +98,15 @@ jobs:
       id: tf-plan
       run: |
         cd infrastructure
-        export exitcode=0
+        set +e  # Disable exit on error temporarily
         terraform plan -detailed-exitcode -no-color -out tfplan \
-          -var-file="environments/${{ inputs.environment }}/terraform.tfvars" \
-          || export exitcode=$?
+          -var-file="environments/${{ inputs.environment }}/terraform.tfvars"
+        exitcode=$?
+        set -e  # Re-enable exit on error
 
         echo "exitcode=$exitcode" >> $GITHUB_OUTPUT
+        echo "Terraform plan exit code: $exitcode"
+        echo "📊 Plan Exit Code: $exitcode" >> $GITHUB_STEP_SUMMARY
         
         if [ $exitcode -eq 1 ]; then
           echo "❌ Terraform Plan Failed!" >> $GITHUB_STEP_SUMMARY
@@ -113,8 +116,6 @@ jobs:
         else
           echo "✅ No changes detected" >> $GITHUB_STEP_SUMMARY
         fi
-        
-        exit 0
 
     - name: Generate Plan Summary
       id: plan-summary
