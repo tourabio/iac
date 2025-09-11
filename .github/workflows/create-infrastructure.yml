@@ -130,7 +130,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: tfplan-${{ github.run_number }}
-        path: tfplan
+        path: infrastructure/tfplan
         retention-days: 30
 
     - name: Show Plan Summary
@@ -208,7 +208,9 @@ jobs:
           terraform-${{ runner.os }}-
 
     - name: Terraform Init
-      run: terraform init
+      run: |
+        cd infrastructure
+        terraform init
 
     - name: Download Terraform Plan
       uses: actions/download-artifact@v4
@@ -218,7 +220,7 @@ jobs:
     - name: Verify Plan Before Apply
       run: |
         echo "## 🔍 Verifying Plan Before Apply" >> $GITHUB_STEP_SUMMARY
-        terraform show -no-color tfplan | head -20 >> $GITHUB_STEP_SUMMARY
+        cd infrastructure && terraform show -no-color tfplan | head -20 >> $GITHUB_STEP_SUMMARY
 
     - name: Terraform Apply
       id: apply
@@ -239,6 +241,7 @@ jobs:
       if: steps.apply.outputs.apply_success == 'true'
       id: outputs
       run: |
+        cd infrastructure
         echo "rg_name=$(terraform output -raw resource_group_name)" >> $GITHUB_OUTPUT
         echo "acr_name=$(terraform output -raw acr_name)" >> $GITHUB_OUTPUT
         echo "acr_server=$(terraform output -raw acr_login_server)" >> $GITHUB_OUTPUT
