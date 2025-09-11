@@ -279,46 +279,28 @@ jobs:
         
         rm -rf tfplan-artifacts
 
+    - name: Verify Downloaded Files
+      run: |
+        echo "📁 Infrastructure directory after download:"
+        ls -la infrastructure/
+        
+        cd infrastructure
+        if [ -f "tfplan" ]; then
+          echo "✅ Plan file ready for apply"
+          echo "📊 Plan file info:"
+          file tfplan
+          ls -la tfplan
+        else
+          echo "❌ Plan file still missing after move!"
+          echo "🔍 Current directory contents:"
+          ls -la
+          exit 1
+        fi
+
     - name: Terraform Init
       run: |
         cd infrastructure
         terraform init
-
-    - name: Verify Downloaded Files
-      run: |
-        echo "📁 Root directory:" >> $GITHUB_STEP_SUMMARY
-        ls -la >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "📁 Infrastructure directory:" >> $GITHUB_STEP_SUMMARY
-        ls -la infrastructure/ >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        
-        # Check if files exist in root or infrastructure directory
-        echo "🔍 Searching for tfplan file:" >> $GITHUB_STEP_SUMMARY
-        find . -name "tfplan" -type f 2>/dev/null >> $GITHUB_STEP_SUMMARY || echo "tfplan not found anywhere" >> $GITHUB_STEP_SUMMARY
-        
-        echo "🔍 Searching for .terraform.lock.hcl file:" >> $GITHUB_STEP_SUMMARY
-        find . -name ".terraform.lock.hcl" -type f 2>/dev/null >> $GITHUB_STEP_SUMMARY || echo ".terraform.lock.hcl not found anywhere" >> $GITHUB_STEP_SUMMARY
-        
-        # Move files to correct location if needed
-        if [ -f "tfplan" ]; then
-          echo "📦 Moving tfplan from root to infrastructure/" >> $GITHUB_STEP_SUMMARY
-          mv tfplan infrastructure/
-        fi
-        
-        if [ -f ".terraform.lock.hcl" ]; then
-          echo "📦 Moving .terraform.lock.hcl from root to infrastructure/" >> $GITHUB_STEP_SUMMARY
-          mv .terraform.lock.hcl infrastructure/
-        fi
-        
-        # Final verification
-        cd infrastructure
-        if [ -f "tfplan" ]; then
-          echo "✅ Plan file ready for apply" >> $GITHUB_STEP_SUMMARY
-        else
-          echo "❌ Plan file still missing!" >> $GITHUB_STEP_SUMMARY
-          exit 1
-        fi
 
     - name: Verify Plan Before Apply
       run: |
