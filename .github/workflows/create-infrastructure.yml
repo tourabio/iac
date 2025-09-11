@@ -36,6 +36,7 @@ jobs:
       uses: hashicorp/setup-terraform@v3
       with:
         terraform_version: 1.5.0
+        terraform_wrapper: false
 
     - name: Terraform Format Check
       run: |
@@ -77,6 +78,7 @@ jobs:
       uses: hashicorp/setup-terraform@v3
       with:
         terraform_version: 1.5.0
+        terraform_wrapper: false
 
     - name: Cache Terraform
       uses: actions/cache@v3
@@ -98,23 +100,34 @@ jobs:
       id: tf-plan
       run: |
         cd infrastructure
+        echo "Running: terraform plan -detailed-exitcode -no-color -out tfplan -var-file=\"environments/${{ inputs.environment }}/terraform.tfvars\""
+        
         set +e  # Disable exit on error temporarily
         terraform plan -detailed-exitcode -no-color -out tfplan \
           -var-file="environments/${{ inputs.environment }}/terraform.tfvars"
         exitcode=$?
         set -e  # Re-enable exit on error
 
+        echo "Raw exit code: $exitcode"
         echo "exitcode=$exitcode" >> $GITHUB_OUTPUT
-        echo "Terraform plan exit code: $exitcode"
         echo "📊 Plan Exit Code: $exitcode" >> $GITHUB_STEP_SUMMARY
+        
+        # Double-check by looking at the plan output
+        if [ -f "tfplan" ]; then
+          echo "📋 Plan file exists, checking contents..." >> $GITHUB_STEP_SUMMARY
+          if terraform show -no-color tfplan | grep -E "(Plan:|No changes)" > /dev/null; then
+            echo "📄 Plan summary:" >> $GITHUB_STEP_SUMMARY
+            terraform show -no-color tfplan | head -5 >> $GITHUB_STEP_SUMMARY
+          fi
+        fi
         
         if [ $exitcode -eq 1 ]; then
           echo "❌ Terraform Plan Failed!" >> $GITHUB_STEP_SUMMARY
           exit 1
         elif [ $exitcode -eq 2 ]; then
-          echo "📝 Changes detected in plan" >> $GITHUB_STEP_SUMMARY
+          echo "📝 Changes detected in plan (exit code 2)" >> $GITHUB_STEP_SUMMARY
         else
-          echo "✅ No changes detected" >> $GITHUB_STEP_SUMMARY
+          echo "✅ No changes detected (exit code 0)" >> $GITHUB_STEP_SUMMARY
         fi
 
     - name: Generate Plan Summary
@@ -197,6 +210,7 @@ jobs:
       uses: hashicorp/setup-terraform@v3
       with:
         terraform_version: 1.5.0
+        terraform_wrapper: false
 
     - name: Cache Terraform
       uses: actions/cache@v3
