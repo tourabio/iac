@@ -311,6 +311,20 @@ jobs:
       id: apply
       run: |
         echo "Starting infrastructure deployment..."
+        cd infrastructure
+        
+        echo "🔍 Current directory: $(pwd)"
+        echo "📁 Files in current directory:"
+        ls -la
+        
+        if [ ! -f "tfplan" ]; then
+          echo "❌ ERROR: tfplan file is missing!"
+          echo "🔍 Searching for tfplan in entire workspace:"
+          find /home/runner/work -name "tfplan" -type f 2>/dev/null || echo "No tfplan found anywhere"
+          exit 1
+        fi
+        
+        echo "✅ tfplan file found, proceeding with apply..."
         terraform apply -auto-approve tfplan
         
         if [ $? -eq 0 ]; then
