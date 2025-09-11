@@ -144,7 +144,9 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: tfplan-${{ github.run_number }}
-        path: infrastructure/tfplan
+        path: |
+          infrastructure/tfplan
+          infrastructure/.terraform.lock.hcl
         retention-days: 30
 
     - name: Show Plan Summary
@@ -222,15 +224,24 @@ jobs:
         restore-keys: |
           terraform-${{ runner.os }}-
 
+    - name: Download Terraform Plan
+      uses: actions/download-artifact@v4
+      with:
+        name: tfplan-${{ github.run_number }}
+        path: infrastructure/
+
     - name: Terraform Init
       run: |
         cd infrastructure
         terraform init
 
-    - name: Download Terraform Plan
-      uses: actions/download-artifact@v4
-      with:
-        name: tfplan-${{ github.run_number }}
+    - name: Verify Downloaded Files
+      run: |
+        cd infrastructure
+        echo "📁 Downloaded files:" >> $GITHUB_STEP_SUMMARY
+        ls -la tfplan .terraform.lock.hcl >> $GITHUB_STEP_SUMMARY 2>&1 || echo "Some files missing" >> $GITHUB_STEP_SUMMARY
+        echo "🔍 Lock file content preview:" >> $GITHUB_STEP_SUMMARY
+        head -10 .terraform.lock.hcl >> $GITHUB_STEP_SUMMARY 2>&1 || echo "No lock file" >> $GITHUB_STEP_SUMMARY
 
     - name: Verify Plan Before Apply
       run: |
