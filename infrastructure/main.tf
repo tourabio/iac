@@ -13,7 +13,7 @@ provider "azurerm" {
   features {}
   subscription_id            = var.subscription_id
   skip_provider_registration = true
-  
+
   # Use environment variables for authentication in GitHub Actions
   # ARM_CLIENT_ID, ARM_CLIENT_SECRET, ARM_TENANT_ID, ARM_SUBSCRIPTION_ID
 }
