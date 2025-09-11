@@ -145,8 +145,26 @@ jobs:
         cd infrastructure
         # Create a temporary directory with just the files we need
         mkdir -p ../tfplan-artifacts
-        cp tfplan ../tfplan-artifacts/
-        cp .terraform.lock.hcl ../tfplan-artifacts/
+        
+        # Copy plan file (required)
+        if [ -f "tfplan" ]; then
+          cp tfplan ../tfplan-artifacts/
+          echo "✅ Plan file copied"
+        else
+          echo "❌ Plan file missing!"
+          exit 1
+        fi
+        
+        # Copy lock file (optional but recommended)
+        if [ -f ".terraform.lock.hcl" ]; then
+          cp .terraform.lock.hcl ../tfplan-artifacts/
+          echo "✅ Lock file copied"
+        else
+          echo "⚠️ Lock file not found, will skip"
+        fi
+        
+        echo "📁 Artifacts directory contents:"
+        ls -la ../tfplan-artifacts/
         
     - name: Upload Plan Artifacts
       if: steps.tf-plan.outputs.exitcode == 2
@@ -239,9 +257,26 @@ jobs:
         
     - name: Move Files to Infrastructure
       run: |
-        # Move the downloaded files to the infrastructure directory
-        mv tfplan-artifacts/tfplan infrastructure/
-        mv tfplan-artifacts/.terraform.lock.hcl infrastructure/
+        echo "📁 Downloaded artifacts:"
+        ls -la tfplan-artifacts/
+        
+        # Move plan file (required)
+        if [ -f "tfplan-artifacts/tfplan" ]; then
+          mv tfplan-artifacts/tfplan infrastructure/
+          echo "✅ Plan file moved to infrastructure/"
+        else
+          echo "❌ Plan file missing in artifacts!"
+          exit 1
+        fi
+        
+        # Move lock file (optional)
+        if [ -f "tfplan-artifacts/.terraform.lock.hcl" ]; then
+          mv tfplan-artifacts/.terraform.lock.hcl infrastructure/
+          echo "✅ Lock file moved to infrastructure/"
+        else
+          echo "⚠️ Lock file not found in artifacts, continuing without it"
+        fi
+        
         rm -rf tfplan-artifacts
 
     - name: Terraform Init
