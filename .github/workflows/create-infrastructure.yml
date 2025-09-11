@@ -98,10 +98,6 @@ jobs:
       id: tf-plan
       run: |
         cd infrastructure
-        echo "Current directory: $(pwd)"
-        echo "Environment: ${{ inputs.environment }}"
-        echo "Looking for: environments/${{ inputs.environment }}/terraform.tfvars"
-        ls -la environments/${{ inputs.environment }}/
         export exitcode=0
         terraform plan -detailed-exitcode -no-color -out tfplan \
           -var-file="environments/${{ inputs.environment }}/terraform.tfvars" \

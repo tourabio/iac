@@ -20,6 +20,9 @@ terraform.tfvars
 secrets.tfvars
 *.secret.tfvars
 
+# Allow environment-specific tfvars (these don't contain secrets)
+!infrastructure/environments/*/terraform.tfvars
+
 # Ignore override files as they are usually used to override resources locally and so
 # are not checked in
 override.tf
