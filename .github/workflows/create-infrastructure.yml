@@ -141,11 +141,19 @@ jobs:
 
     - name: Publish Terraform Plan
       if: steps.tf-plan.outputs.exitcode == 2
+      run: |
+        cd infrastructure
+        # Create a temporary directory with just the files we need
+        mkdir -p ../tfplan-artifacts
+        cp tfplan ../tfplan-artifacts/
+        cp .terraform.lock.hcl ../tfplan-artifacts/
+        
+    - name: Upload Plan Artifacts
+      if: steps.tf-plan.outputs.exitcode == 2
       uses: actions/upload-artifact@v4
       with:
         name: tfplan-${{ github.run_number }}
-        path: infrastructure/
-        include-hidden-files: true
+        path: tfplan-artifacts/
         retention-days: 30
 
     - name: Show Plan Summary
@@ -227,7 +235,14 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: tfplan-${{ github.run_number }}
-        path: infrastructure/
+        path: tfplan-artifacts/
+        
+    - name: Move Files to Infrastructure
+      run: |
+        # Move the downloaded files to the infrastructure directory
+        mv tfplan-artifacts/tfplan infrastructure/
+        mv tfplan-artifacts/.terraform.lock.hcl infrastructure/
+        rm -rf tfplan-artifacts
 
     - name: Terraform Init
       run: |
@@ -236,21 +251,37 @@ jobs:
 
     - name: Verify Downloaded Files
       run: |
-        cd infrastructure
-        echo "📁 Infrastructure directory files:" >> $GITHUB_STEP_SUMMARY
+        echo "📁 Root directory:" >> $GITHUB_STEP_SUMMARY
         ls -la >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "📁 Infrastructure directory:" >> $GITHUB_STEP_SUMMARY
+        ls -la infrastructure/ >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
         
+        # Check if files exist in root or infrastructure directory
+        echo "🔍 Searching for tfplan file:" >> $GITHUB_STEP_SUMMARY
+        find . -name "tfplan" -type f 2>/dev/null >> $GITHUB_STEP_SUMMARY || echo "tfplan not found anywhere" >> $GITHUB_STEP_SUMMARY
+        
+        echo "🔍 Searching for .terraform.lock.hcl file:" >> $GITHUB_STEP_SUMMARY
+        find . -name ".terraform.lock.hcl" -type f 2>/dev/null >> $GITHUB_STEP_SUMMARY || echo ".terraform.lock.hcl not found anywhere" >> $GITHUB_STEP_SUMMARY
+        
+        # Move files to correct location if needed
         if [ -f "tfplan" ]; then
-          echo "✅ Plan file found" >> $GITHUB_STEP_SUMMARY
-        else
-          echo "❌ Plan file missing!" >> $GITHUB_STEP_SUMMARY
-          exit 1
+          echo "📦 Moving tfplan from root to infrastructure/" >> $GITHUB_STEP_SUMMARY
+          mv tfplan infrastructure/
         fi
         
         if [ -f ".terraform.lock.hcl" ]; then
-          echo "✅ Lock file found" >> $GITHUB_STEP_SUMMARY
+          echo "📦 Moving .terraform.lock.hcl from root to infrastructure/" >> $GITHUB_STEP_SUMMARY
+          mv .terraform.lock.hcl infrastructure/
+        fi
+        
+        # Final verification
+        cd infrastructure
+        if [ -f "tfplan" ]; then
+          echo "✅ Plan file ready for apply" >> $GITHUB_STEP_SUMMARY
         else
-          echo "❌ Lock file missing!" >> $GITHUB_STEP_SUMMARY
+          echo "❌ Plan file still missing!" >> $GITHUB_STEP_SUMMARY
           exit 1
         fi
 
