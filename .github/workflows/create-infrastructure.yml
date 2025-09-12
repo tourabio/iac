@@ -111,12 +111,7 @@ jobs:
         echo "exitcode=$exitcode" >> $GITHUB_OUTPUT
         
         if [ $exitcode -eq 1 ]; then
-          echo "❌ Terraform Plan Failed!" >> $GITHUB_STEP_SUMMARY
           exit 1
-        elif [ $exitcode -eq 2 ]; then
-          echo "📝 Changes detected in plan" >> $GITHUB_STEP_SUMMARY
-        else
-          echo "✅ No changes detected (exit code 0)" >> $GITHUB_STEP_SUMMARY
         fi
 
     - name: Publish Terraform Plan
@@ -129,22 +124,14 @@ jobs:
         # Copy plan file (required)
         if [ -f "tfplan" ]; then
           cp tfplan ../tfplan-artifacts/
-          echo "✅ Plan file copied"
         else
-          echo "❌ Plan file missing!"
           exit 1
         fi
         
         # Copy lock file (optional but recommended)
         if [ -f ".terraform.lock.hcl" ]; then
           cp .terraform.lock.hcl ../tfplan-artifacts/
-          echo "✅ Lock file copied"
-        else
-          echo "⚠️ Lock file not found, will skip"
         fi
-        
-        echo "📁 Artifacts directory contents:"
-        ls -la ../tfplan-artifacts/
         
     - name: Upload Plan Artifacts
       if: steps.tf-plan.outputs.exitcode == '2'
@@ -205,43 +192,24 @@ jobs:
         
     - name: Move Files to Infrastructure
       run: |
-        echo "📁 Downloaded artifacts:"
-        ls -la tfplan-artifacts/
-        
         # Move plan file (required)
         if [ -f "tfplan-artifacts/tfplan" ]; then
           mv tfplan-artifacts/tfplan infrastructure/
-          echo "✅ Plan file moved to infrastructure/"
         else
-          echo "❌ Plan file missing in artifacts!"
           exit 1
         fi
         
         # Move lock file (optional)
         if [ -f "tfplan-artifacts/.terraform.lock.hcl" ]; then
           mv tfplan-artifacts/.terraform.lock.hcl infrastructure/
-          echo "✅ Lock file moved to infrastructure/"
-        else
-          echo "⚠️ Lock file not found in artifacts, continuing without it"
         fi
         
         rm -rf tfplan-artifacts
 
     - name: Verify Downloaded Files
       run: |
-        echo "📁 Infrastructure directory after download:"
-        ls -la infrastructure/
-        
         cd infrastructure
-        if [ -f "tfplan" ]; then
-          echo "✅ Plan file ready for apply"
-          echo "📊 Plan file info:"
-          file tfplan
-          ls -la tfplan
-        else
-          echo "❌ Plan file still missing after move!"
-          echo "🔍 Current directory contents:"
-          ls -la
+        if [ ! -f "tfplan" ]; then
           exit 1
         fi
 
@@ -254,29 +222,18 @@ jobs:
     - name: Terraform Apply
       id: apply
       run: |
-        echo "Starting infrastructure deployment..."
         cd infrastructure
         
-        echo "🔍 Current directory: $(pwd)"
-        echo "📁 Files in current directory:"
-        ls -la
-        
         if [ ! -f "tfplan" ]; then
-          echo "❌ ERROR: tfplan file is missing!"
-          echo "🔍 Searching for tfplan in entire workspace:"
-          find /home/runner/work -name "tfplan" -type f 2>/dev/null || echo "No tfplan found anywhere"
           exit 1
         fi
         
-        echo "✅ tfplan file found, proceeding with apply..."
         terraform apply -auto-approve tfplan
         
         if [ $? -eq 0 ]; then
           echo "apply_success=true" >> $GITHUB_OUTPUT
-          echo "✅ Apply completed successfully" >> $GITHUB_STEP_SUMMARY
         else
           echo "apply_success=false" >> $GITHUB_OUTPUT
-          echo "❌ Apply failed" >> $GITHUB_STEP_SUMMARY
           exit 1
         fi
 
@@ -290,18 +247,6 @@ jobs:
         echo "acr_server=$(terraform output -raw acr_login_server)" >> $GITHUB_OUTPUT
         echo "acr_id=$(terraform output -raw acr_id)" >> $GITHUB_OUTPUT
 
-    - name: Show Deployment Summary
-      if: steps.apply.outputs.apply_success == 'true'
-      run: |
-        echo "## 🚀 Infrastructure Deployed Successfully!" >> $GITHUB_STEP_SUMMARY
-        echo "**Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
-        echo "**Deployed at:** $(date -u)" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### 📦 Resources Created:" >> $GITHUB_STEP_SUMMARY
-        echo "- **Resource Group**: ${{ steps.outputs.outputs.rg_name }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **ACR Name**: ${{ steps.outputs.outputs.acr_name }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **ACR Login Server**: ${{ steps.outputs.outputs.acr_server }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **ACR Resource ID**: ${{ steps.outputs.outputs.acr_id }}" >> $GITHUB_STEP_SUMMARY
 
     - name: Create GitHub Release
       if: steps.apply.outputs.apply_success == 'true' && inputs.environment == 'prod'
