@@ -212,21 +212,7 @@ jobs:
       
     steps:
     - name: Manual Approval Checkpoint
-      run: |
-        echo "## ✋ Manual Approval Required" >> $GITHUB_STEP_SUMMARY
-        echo "**Environment**: ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
-        echo "**Requested by**: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
-        echo "**Workflow Run**: [${{ github.run_id }}](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "🔍 **Review Required:**" >> $GITHUB_STEP_SUMMARY
-        echo "1. Review the Terraform plan in the previous step" >> $GITHUB_STEP_SUMMARY
-        echo "2. Verify the changes match your expectations" >> $GITHUB_STEP_SUMMARY
-        echo "3. If you see 'Review deployments' button → Click it to approve/reject" >> $GITHUB_STEP_SUMMARY
-        echo "4. If no button appears → Environment protection rules need setup" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "⚠️ **Protection Status**: This job will only pause if environment protection rules are configured" >> $GITHUB_STEP_SUMMARY
-        echo "✅ **With Protection**: Manual approval required via button click" >> $GITHUB_STEP_SUMMARY
-        echo "➡️ **Without Protection**: Job continues automatically" >> $GITHUB_STEP_SUMMARY
+      run: echo "Waiting for manual approval..."
 
   # ============================================================================
   # INFRASTRUCTURE DEPLOYMENT

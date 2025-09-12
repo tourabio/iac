@@ -90,23 +90,7 @@ jobs:
       
     steps:
     - name: Destruction Approval Checkpoint
-      run: |
-        echo "## ⚠️ DESTRUCTION APPROVAL REQUIRED" >> $GITHUB_STEP_SUMMARY
-        echo "**Environment**: ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
-        echo "**Requested by**: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
-        echo "**Action**: DESTROY ALL INFRASTRUCTURE" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "🚨 **DANGER ZONE** 🚨" >> $GITHUB_STEP_SUMMARY
-        echo "This will permanently delete all resources in the ${{ inputs.environment }} environment!" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "🔍 **Before approving, verify:**" >> $GITHUB_STEP_SUMMARY
-        echo "1. You really want to destroy the ${{ inputs.environment }} environment" >> $GITHUB_STEP_SUMMARY
-        echo "2. No critical workloads are running" >> $GITHUB_STEP_SUMMARY
-        echo "3. You have backups if needed" >> $GITHUB_STEP_SUMMARY
-        echo "4. This is the correct environment" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "✅ **Approve**: Proceed with infrastructure destruction" >> $GITHUB_STEP_SUMMARY
-        echo "❌ **Reject**: Cancel destruction and keep resources" >> $GITHUB_STEP_SUMMARY
+      run: echo "Waiting for destruction approval..."
 
   # ============================================================================
   # INFRASTRUCTURE DESTRUCTION
