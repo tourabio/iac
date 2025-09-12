@@ -207,17 +207,25 @@ jobs:
     needs: [terraform-plan]
     if: needs.terraform-plan.outputs.tfplanExitCode == 2
     environment: 
-      name: approval-${{ inputs.environment }}
+      name: manual-approval-${{ inputs.environment }}
+      url: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
       
     steps:
-    - name: Manual Approval Required
+    - name: Wait for Manual Approval
       run: |
         echo "## ✋ Manual Approval Required" >> $GITHUB_STEP_SUMMARY
         echo "**Environment**: ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
         echo "**Requested by**: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Workflow Run**: [${{ github.run_id }}](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "Please review the Terraform plan above and approve this deployment." >> $GITHUB_STEP_SUMMARY
-        echo "The infrastructure changes will be applied after approval." >> $GITHUB_STEP_SUMMARY
+        echo "🔍 **Review Required:**" >> $GITHUB_STEP_SUMMARY
+        echo "1. Review the Terraform plan in the previous step" >> $GITHUB_STEP_SUMMARY
+        echo "2. Verify the changes match your expectations" >> $GITHUB_STEP_SUMMARY
+        echo "3. Click 'Review deployments' button to approve/reject" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "⚠️ **Important**: This step will wait indefinitely until manually approved or rejected." >> $GITHUB_STEP_SUMMARY
+        echo "✅ **Approved**: Infrastructure changes will be applied" >> $GITHUB_STEP_SUMMARY
+        echo "❌ **Rejected**: Workflow will be cancelled" >> $GITHUB_STEP_SUMMARY
 
   # ============================================================================
   # INFRASTRUCTURE DEPLOYMENT
