@@ -321,26 +321,3 @@ jobs:
           Deployed on: $(date -u)
         draft: false
         prerelease: false
-
-  # ============================================================================
-  # POST-DEPLOYMENT NOTIFICATIONS
-  # ============================================================================
-  notify:
-    name: '📬 Notify'
-    runs-on: ubuntu-latest
-    needs: [terraform-apply]
-    if: always()
-    
-    steps:
-    - name: Deployment Status
-      run: |
-        if [ "${{ needs.terraform-apply.result }}" == "success" ]; then
-          echo "## ✅ Deployment Completed Successfully" >> $GITHUB_STEP_SUMMARY
-          echo "Infrastructure has been deployed to **${{ inputs.environment }}** environment." >> $GITHUB_STEP_SUMMARY
-        elif [ "${{ needs.terraform-apply.result }}" == "failure" ]; then
-          echo "## ❌ Deployment Failed" >> $GITHUB_STEP_SUMMARY
-          echo "Please check the logs and retry the deployment." >> $GITHUB_STEP_SUMMARY
-        elif [ "${{ needs.terraform-apply.result }}" == "cancelled" ]; then
-          echo "## ⏹️ Deployment Cancelled" >> $GITHUB_STEP_SUMMARY
-          echo "The deployment was cancelled by user." >> $GITHUB_STEP_SUMMARY
-        fi
