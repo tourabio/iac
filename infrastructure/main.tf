@@ -7,6 +7,13 @@ terraform {
   }
 
   required_version = ">= 0.14"
+
+  backend "azurerm" {
+    resource_group_name  = "terraform-state-rg"
+    storage_account_name = "tfstatewalletwatch"
+    container_name       = "tfstate"
+    key                  = "walletwatch.tfstate"
+  }
 }
 
 provider "azurerm" {

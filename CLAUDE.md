@@ -11,7 +11,7 @@ This is a professionally structured Terraform-based Infrastructure as Code (IaC)
 - **Provider**: Azure Resource Manager (AzureRM) v3.67.0
 - **Structure**: Modular Terraform with environment separation
 - **Deployment**: Enhanced GitHub Actions workflows with validation
-- **State Management**: Local Terraform state with backup strategies
+- **State Management**: Azure Storage Backend with versioning and encryption
 
 ### Core Components
 
@@ -79,11 +79,17 @@ Each environment has specific resource names and SKUs:
 - Comprehensive error handling
 
 ### Prerequisites
-Required GitHub Secrets:
+
+**Initial Setup:**
+1. Run `./scripts/setup-backend.sh` to create Azure backend storage
+2. Configure GitHub Secrets (required for workflows)
+
+**Required GitHub Secrets:**
 - `ARM_CLIENT_ID` - Azure Service Principal Application ID
 - `ARM_CLIENT_SECRET` - Azure Service Principal Secret  
 - `ARM_TENANT_ID` - Azure Tenant ID
 - `ARM_SUBSCRIPTION_ID` - Azure Subscription ID
+- `ARM_ACCESS_KEY` - Storage Account Access Key (for Terraform backend)
 
 ### Deployment Workflow (`create-infrastructure.yml`)
 **Sections**:
