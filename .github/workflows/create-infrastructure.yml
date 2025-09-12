@@ -208,12 +208,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: [terraform-plan]
     if: needs.terraform-plan.outputs.tfplanExitCode == 2
-    environment: 
-      name: manual-approval-${{ inputs.environment }}
-      url: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    environment: ${{ inputs.environment }}-approval
       
     steps:
-    - name: Wait for Manual Approval
+    - name: Manual Approval Checkpoint
       run: |
         echo "## ✋ Manual Approval Required" >> $GITHUB_STEP_SUMMARY
         echo "**Environment**: ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
@@ -223,11 +221,12 @@ jobs:
         echo "🔍 **Review Required:**" >> $GITHUB_STEP_SUMMARY
         echo "1. Review the Terraform plan in the previous step" >> $GITHUB_STEP_SUMMARY
         echo "2. Verify the changes match your expectations" >> $GITHUB_STEP_SUMMARY
-        echo "3. Click 'Review deployments' button to approve/reject" >> $GITHUB_STEP_SUMMARY
+        echo "3. If you see 'Review deployments' button → Click it to approve/reject" >> $GITHUB_STEP_SUMMARY
+        echo "4. If no button appears → Environment protection rules need setup" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "⚠️ **Important**: This step will wait indefinitely until manually approved or rejected." >> $GITHUB_STEP_SUMMARY
-        echo "✅ **Approved**: Infrastructure changes will be applied" >> $GITHUB_STEP_SUMMARY
-        echo "❌ **Rejected**: Workflow will be cancelled" >> $GITHUB_STEP_SUMMARY
+        echo "⚠️ **Protection Status**: This job will only pause if environment protection rules are configured" >> $GITHUB_STEP_SUMMARY
+        echo "✅ **With Protection**: Manual approval required via button click" >> $GITHUB_STEP_SUMMARY
+        echo "➡️ **Without Protection**: Job continues automatically" >> $GITHUB_STEP_SUMMARY
 
   # ============================================================================
   # INFRASTRUCTURE DEPLOYMENT
@@ -236,7 +235,6 @@ jobs:
     name: '🚀 Apply'
     if: needs.terraform-plan.outputs.tfplanExitCode == 2
     runs-on: ubuntu-latest
-    environment: production
     needs: [validate, terraform-plan, approve-deployment]
     
     steps:

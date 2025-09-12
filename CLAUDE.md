@@ -83,6 +83,7 @@ Each environment has specific resource names and SKUs:
 **Initial Setup:**
 1. Run `./scripts/setup-backend.sh` to create Azure backend storage
 2. Configure GitHub Secrets (required for workflows)
+3. Set up GitHub Environments for manual approval (see below)
 
 **Required GitHub Secrets:**
 - `ARM_CLIENT_ID` - Azure Service Principal Application ID
@@ -90,6 +91,19 @@ Each environment has specific resource names and SKUs:
 - `ARM_TENANT_ID` - Azure Tenant ID
 - `ARM_SUBSCRIPTION_ID` - Azure Subscription ID
 - `ARM_ACCESS_KEY` - Storage Account Access Key (for Terraform backend)
+
+**Required GitHub Environments (for manual approval):**
+Create these environments in GitHub repository settings:
+- `dev-approval` - For development deployments
+- `staging-approval` - For staging deployments  
+- `prod-approval` - For production deployments
+
+For each environment:
+1. Go to Settings → Environments → New environment
+2. Add environment name (e.g., `dev-approval`)
+3. Enable "Required reviewers" protection rule
+4. Add yourself as a required reviewer
+5. Save protection rules
 
 ### Deployment Workflow (`create-infrastructure.yml`)
 **Sections**:

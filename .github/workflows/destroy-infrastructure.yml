@@ -24,8 +24,8 @@ env:
   ARM_ACCESS_KEY: ${{ secrets.ARM_ACCESS_KEY }}
 
 jobs:
-  terraform-destroy:
-    name: '🗑️ Destroy'
+  validate-destruction:
+    name: '🔍 Validate Destruction'
     runs-on: ubuntu-latest
     
     steps:
@@ -53,10 +53,17 @@ jobs:
         echo "**Timestamp**: $(date -u)" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         
-        # Get current resources
+        # Get current resources and save for destruction summary
         if terraform show -json 2>/dev/null | jq -e '.values.root_module.resources' > /dev/null 2>&1; then
-          echo "**Resources found:**" >> $GITHUB_STEP_SUMMARY
-          terraform show -json | jq -r '.values.root_module.resources[]? | "- \(.type): \(.values.name // .values.id // "N/A")"' >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "- Unable to parse resources" >> $GITHUB_STEP_SUMMARY
+          echo "**Resources found in state:**" >> $GITHUB_STEP_SUMMARY
+          
+          # Save resource list for destruction summary
+          terraform show -json | jq -r '.values.root_module.resources[]? | "- \(.type): \(.values.name // .values.id // "N/A")"' > /tmp/resources_before.txt 2>/dev/null || echo "- Unable to parse resources" > /tmp/resources_before.txt
+          cat /tmp/resources_before.txt >> $GITHUB_STEP_SUMMARY
+          
+          # Count resources
+          RESOURCE_COUNT=$(terraform show -json 2>/dev/null | jq '.values.root_module.resources | length' 2>/dev/null || echo "0")
+          echo "RESOURCES_TO_DESTROY=$RESOURCE_COUNT" >> $GITHUB_ENV
           
           # Get outputs if available
           if terraform output -json 2>/dev/null | jq -e '. != {}' > /dev/null 2>&1; then
@@ -68,12 +75,69 @@ jobs:
           fi
         else
           echo "**No resources found in state**" >> $GITHUB_STEP_SUMMARY
+          echo "RESOURCES_TO_DESTROY=0" >> $GITHUB_ENV
+          echo "No resources to destroy" > /tmp/resources_before.txt
         fi
+
+  # ============================================================================
+  # MANUAL APPROVAL
+  # ============================================================================
+  approve-destruction:
+    name: '⚠️ Approve Destruction'
+    runs-on: ubuntu-latest
+    needs: [validate-destruction]
+    environment: ${{ inputs.environment }}-approval
+      
+    steps:
+    - name: Destruction Approval Checkpoint
+      run: |
+        echo "## ⚠️ DESTRUCTION APPROVAL REQUIRED" >> $GITHUB_STEP_SUMMARY
+        echo "**Environment**: ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Requested by**: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Action**: DESTROY ALL INFRASTRUCTURE" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "🚨 **DANGER ZONE** 🚨" >> $GITHUB_STEP_SUMMARY
+        echo "This will permanently delete all resources in the ${{ inputs.environment }} environment!" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "🔍 **Before approving, verify:**" >> $GITHUB_STEP_SUMMARY
+        echo "1. You really want to destroy the ${{ inputs.environment }} environment" >> $GITHUB_STEP_SUMMARY
+        echo "2. No critical workloads are running" >> $GITHUB_STEP_SUMMARY
+        echo "3. You have backups if needed" >> $GITHUB_STEP_SUMMARY
+        echo "4. This is the correct environment" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "✅ **Approve**: Proceed with infrastructure destruction" >> $GITHUB_STEP_SUMMARY
+        echo "❌ **Reject**: Cancel destruction and keep resources" >> $GITHUB_STEP_SUMMARY
+
+  # ============================================================================
+  # INFRASTRUCTURE DESTRUCTION
+  # ============================================================================
+  execute-destruction:
+    name: '🗑️ Execute Destruction'
+    runs-on: ubuntu-latest
+    needs: [validate-destruction, approve-destruction]
+    
+    steps:
+    # Setup and Initialization
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: 1.5.0
+        terraform_wrapper: false
+
+    - name: Terraform Init
+      run: |
+        cd infrastructure
+        terraform init
 
     # Infrastructure Destruction
     - name: Terraform Destroy
       run: |
         cd infrastructure
+        echo "🗑️ Starting destruction of $RESOURCES_TO_DESTROY resources..." >> $GITHUB_STEP_SUMMARY
+        
         terraform destroy -auto-approve \
           -var-file="environments/${{ inputs.environment }}/terraform.tfvars"
 
@@ -88,13 +152,22 @@ jobs:
         echo "**Completed at**: $(date -u)" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         
+        # Show what was destroyed
+        if [ "$RESOURCES_TO_DESTROY" -gt "0" ]; then
+          echo "✅ **Resources Destroyed** ($RESOURCES_TO_DESTROY total):" >> $GITHUB_STEP_SUMMARY
+          cat /tmp/resources_before.txt >> $GITHUB_STEP_SUMMARY
+        else
+          echo "ℹ️ **No resources were destroyed** (state was already empty)" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
         # Verify destruction
         REMAINING=$(terraform show -json 2>/dev/null | jq '.values.root_module.resources | length' 2>/dev/null || echo "0")
         
         if [ "$REMAINING" -eq "0" ]; then
-          echo "✅ **Status**: All resources successfully destroyed" >> $GITHUB_STEP_SUMMARY
-          echo "🧹 **State**: Clean - no resources remaining" >> $GITHUB_STEP_SUMMARY
+          echo "🧹 **State**: Clean - no resources remaining in Terraform state" >> $GITHUB_STEP_SUMMARY
         else
-          echo "⚠️ **Status**: $REMAINING resources may still exist" >> $GITHUB_STEP_SUMMARY
+          echo "⚠️ **Warning**: $REMAINING resources may still exist in state" >> $GITHUB_STEP_SUMMARY
           echo "📝 **Action**: Manual cleanup may be required" >> $GITHUB_STEP_SUMMARY
         fi
