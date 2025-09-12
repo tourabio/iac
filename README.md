@@ -23,12 +23,43 @@ This repository contains Terraform infrastructure code for deploying Azure Conta
 └── CLAUDE.md              # Claude Code guidance
 ```
 
+## 🏗️ Provisioned Infrastructure
+
+### Backend Resources (Manually Created)
+- **Resource Group**: `terraform-state-rg` (West Europe)
+- **Storage Account**: `tfstatewalletwatch`
+- **Storage Container**: `tfstate`
+- **Purpose**: Terraform remote state management with versioning and encryption
+
+### Application Resources (Terraform Managed)
+Currently configured to deploy:
+- **Resource Groups**: Environment-specific (dev/staging/prod)
+- **Azure Container Registry**: Environment-specific ACR instances
+- **SKU Configuration**: Basic (dev), Standard (staging), Premium (prod)
+
+## 🔐 GitHub Actions Secrets
+
+### Required Secrets for CI/CD
+```
+ARM_CLIENT_ID=<azure-service-principal-app-id>
+ARM_CLIENT_SECRET=<azure-service-principal-secret>
+ARM_TENANT_ID=<azure-tenant-id>
+ARM_SUBSCRIPTION_ID=<azure-subscription-id>
+ARM_ACCESS_KEY=<storage-account-access-key>
+```
+
+### How to Get Secret Values
+1. **Service Principal Credentials**: Create via `az ad sp create-for-rbac`
+2. **Tenant/Subscription IDs**: Found in Azure Portal → Azure Active Directory
+3. **ARM_ACCESS_KEY**: Azure Portal → Storage Account → Access Keys
+
 ## 🚀 Quick Start
 
 ### Prerequisites
 - [Terraform](https://www.terraform.io/downloads.html) >= 0.14
 - [Azure CLI](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli)
-- Azure subscription with appropriate permissions
+- Azure subscription with Contributor permissions
+- Terraform backend storage created (see above)
 
 ### Local Development
 

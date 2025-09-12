@@ -139,3 +139,11 @@ Each environment has specific resource names and SKUs:
 - **Approval Workflows**: Manual approval for production changes
 - **State Management**: Backup and archiving strategies
 - **Tagging Strategy**: Consistent resource tagging
+
+## Documentation Requirements
+IMPORTANT: When adding new infrastructure resources or GitHub Actions secrets:
+1. ALWAYS update the README.md "🏗️ Provisioned Infrastructure" section
+2. ALWAYS update the README.md "🔐 GitHub Actions Secrets" section  
+3. Document what each resource does and why it's needed
+4. Include instructions for obtaining secret values
+5. Keep the resource inventory current and accurate
