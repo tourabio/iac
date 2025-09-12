@@ -109,7 +109,7 @@ jobs:
         exitcode=$?
         set -e  # Re-enable exit on error
 
-        echo "📊 Plan Exit Code: $exitcode" >> $GITHUB_STEP_SUMMARY
+        echo "exitcode=$exitcode" >> $GITHUB_OUTPUT
         
         if [ $exitcode -eq 1 ]; then
           echo "❌ Terraform Plan Failed!" >> $GITHUB_STEP_SUMMARY
