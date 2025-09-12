@@ -27,6 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
+    # Setup and Initialization
     - name: Checkout
       uses: actions/checkout@v4
 
@@ -41,6 +42,7 @@ jobs:
         cd infrastructure
         terraform init
 
+    # Pre-Destruction Validation
     - name: List Resources Before Destruction
       run: |
         cd infrastructure
@@ -66,12 +68,14 @@ jobs:
           echo "**No resources found in state**" >> $GITHUB_STEP_SUMMARY
         fi
 
+    # Infrastructure Destruction
     - name: Terraform Destroy
       run: |
         cd infrastructure
         terraform destroy -auto-approve \
           -var-file="environments/${{ inputs.environment }}/terraform.tfvars"
 
+    # Post-Destruction Verification
     - name: Destruction Summary
       run: |
         cd infrastructure
