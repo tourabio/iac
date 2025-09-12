@@ -96,7 +96,6 @@ jobs:
       run: |
         cd infrastructure
         terraform init
-        echo "✅ Terraform initialized successfully" >> $GITHUB_STEP_SUMMARY
 
     - name: Terraform Plan
       id: tf-plan
@@ -120,15 +119,6 @@ jobs:
         else
           echo "✅ No changes detected (exit code 0)" >> $GITHUB_STEP_SUMMARY
         fi
-
-    - name: Generate Plan Summary
-      id: plan-summary
-      if: steps.tf-plan.outputs.exitcode == 2
-      run: |
-        SUMMARY=$(terraform show -no-color tfplan | head -50)
-        echo "summary<<EOF" >> $GITHUB_OUTPUT
-        echo "$SUMMARY" >> $GITHUB_OUTPUT
-        echo "EOF" >> $GITHUB_OUTPUT
 
     - name: Publish Terraform Plan
       if: steps.tf-plan.outputs.exitcode == 2
@@ -164,20 +154,6 @@ jobs:
         name: tfplan-${{ github.run_number }}
         path: tfplan-artifacts/
         retention-days: 30
-
-
-    - name: Comment PR
-      if: github.event_name == 'pull_request' && steps.tf-plan.outputs.exitcode == 2
-      uses: actions/github-script@v6
-      with:
-        script: |
-          const plan = `${{ steps.plan-summary.outputs.summary }}`;
-          github.rest.issues.createComment({
-            issue_number: context.issue.number,
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            body: `## 📋 Terraform Plan\n\`\`\`terraform\n${plan}\n\`\`\``
-          });
 
   # ============================================================================
   # MANUAL APPROVAL
