@@ -41,8 +41,54 @@ jobs:
         cd infrastructure
         terraform init
 
+    - name: List Resources Before Destruction
+      run: |
+        cd infrastructure
+        echo "## 📋 Resources to be Destroyed" >> $GITHUB_STEP_SUMMARY
+        echo "**Environment**: ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Timestamp**: $(date -u)" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Get current resources
+        if terraform show -json 2>/dev/null | jq -e '.values.root_module.resources' > /dev/null 2>&1; then
+          echo "**Resources found:**" >> $GITHUB_STEP_SUMMARY
+          terraform show -json | jq -r '.values.root_module.resources[]? | "- \(.type): \(.values.name // .values.id // "N/A")"' >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "- Unable to parse resources" >> $GITHUB_STEP_SUMMARY
+          
+          # Get outputs if available
+          if terraform output -json 2>/dev/null | jq -e '. != {}' > /dev/null 2>&1; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Current Outputs:**" >> $GITHUB_STEP_SUMMARY
+            echo "- Resource Group: $(terraform output -raw resource_group_name 2>/dev/null || echo 'N/A')" >> $GITHUB_STEP_SUMMARY
+            echo "- ACR Name: $(terraform output -raw acr_name 2>/dev/null || echo 'N/A')" >> $GITHUB_STEP_SUMMARY
+            echo "- ACR Server: $(terraform output -raw acr_login_server 2>/dev/null || echo 'N/A')" >> $GITHUB_STEP_SUMMARY
+          fi
+        else
+          echo "**No resources found in state**" >> $GITHUB_STEP_SUMMARY
+        fi
+
     - name: Terraform Destroy
       run: |
         cd infrastructure
         terraform destroy -auto-approve \
           -var-file="environments/${{ inputs.environment }}/terraform.tfvars"
+
+    - name: Destruction Summary
+      run: |
+        cd infrastructure
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "## 🗑️ Destruction Complete" >> $GITHUB_STEP_SUMMARY
+        echo "**Environment**: ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Destroyed by**: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Completed at**: $(date -u)" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Verify destruction
+        REMAINING=$(terraform show -json 2>/dev/null | jq '.values.root_module.resources | length' 2>/dev/null || echo "0")
+        
+        if [ "$REMAINING" -eq "0" ]; then
+          echo "✅ **Status**: All resources successfully destroyed" >> $GITHUB_STEP_SUMMARY
+          echo "🧹 **State**: Clean - no resources remaining" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "⚠️ **Status**: $REMAINING resources may still exist" >> $GITHUB_STEP_SUMMARY
+          echo "📝 **Action**: Manual cleanup may be required" >> $GITHUB_STEP_SUMMARY
+        fi
