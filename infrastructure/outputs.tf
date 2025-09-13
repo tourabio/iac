@@ -22,3 +22,29 @@ output "acr_id" {
   description = "ID of the Azure Container Registry"
   value       = module.acr.id
 }
+
+# AKS Outputs
+output "aks_cluster_name" {
+  description = "Name of the AKS cluster"
+  value       = module.aks.cluster_name
+}
+
+output "aks_cluster_id" {
+  description = "ID of the AKS cluster"
+  value       = module.aks.cluster_id
+}
+
+output "aks_cluster_fqdn" {
+  description = "FQDN of the AKS cluster"
+  value       = module.aks.cluster_fqdn
+}
+
+output "aks_principal_id" {
+  description = "Principal ID of the AKS system assigned identity"
+  value       = module.aks.principal_id
+}
+
+output "aks_tenant_id" {
+  description = "Tenant ID of the AKS system assigned identity"
+  value       = module.aks.tenant_id
+}
