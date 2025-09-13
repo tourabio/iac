@@ -19,7 +19,7 @@ This repository contains Terraform infrastructure code for deploying Azure Conta
 │   ├── main.tf             # Main Terraform configuration
 │   ├── variables.tf        # Input variables
 │   └── outputs.tf          # Output values
-├── scripts/                # Utility scripts
+├── .github/workflows/       # GitHub Actions workflows
 └── CLAUDE.md              # Claude Code guidance
 ```
 
@@ -69,20 +69,13 @@ ARM_ACCESS_KEY=<storage-account-access-key>
    cd iac
    ```
 
-2. **Using deployment scripts (Recommended):**
-   ```bash
-   # Make scripts executable (Linux/macOS)
-   chmod +x scripts/*.sh
-   
-   # Deploy to development
-   ./scripts/deploy.sh dev YOUR_SUBSCRIPTION_ID
-   
-   # Deploy to staging
-   ./scripts/deploy.sh staging YOUR_SUBSCRIPTION_ID
-   
-   # Deploy to production
-   ./scripts/deploy.sh prod YOUR_SUBSCRIPTION_ID
-   ```
+2. **Using GitHub Actions (Recommended):**
+
+   Infrastructure deployment is handled through GitHub Actions:
+   - Use manual workflow dispatch to trigger deployment
+   - Select target environment (dev/staging/prod) in workflow
+   - Monitor progress in GitHub Actions tab
+   - Both create and destroy workflows are manually triggered
 
 3. **Manual Terraform commands:**
    ```bash

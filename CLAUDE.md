@@ -27,17 +27,14 @@ This is a professionally structured Terraform-based Infrastructure as Code (IaC)
 
 ## Common Commands
 
-### Using Scripts (Recommended)
-```bash
-# Deploy to development
-./scripts/deploy.sh dev YOUR_SUBSCRIPTION_ID
+### Using GitHub Actions (Recommended)
 
-# Deploy to production
-./scripts/deploy.sh prod YOUR_SUBSCRIPTION_ID
+Infrastructure deployment is handled through GitHub Actions workflows:
 
-# Destroy environment
-./scripts/destroy.sh dev YOUR_SUBSCRIPTION_ID
-```
+1. **Manual deployment**: Use workflow dispatch in GitHub Actions
+2. **Environment selection**: Choose dev/staging/prod in workflow
+3. **Monitoring**: Check deployment status in GitHub Actions tab
+4. **Workflow triggers**: Both create and destroy workflows are manually triggered only
 
 ### Direct Terraform Commands
 ```bash
@@ -81,7 +78,7 @@ Each environment has specific resource names and SKUs:
 ### Prerequisites
 
 **Initial Setup:**
-1. Run `./scripts/setup-backend.sh` to create Azure backend storage
+1. Create Azure backend storage manually or via Azure Portal
 2. Configure GitHub Secrets (required for workflows)
 3. Set up GitHub Environments for manual approval (see below)
 
