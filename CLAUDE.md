@@ -64,7 +64,7 @@ terraform destroy -var-file="environments/dev/terraform.tfvars" -var="subscripti
 
 Each environment has specific resource names and SKUs:
 - **dev**: `walletwatchdevacr` with Basic SKU
-- **staging**: `walletwatchstgacr` with Standard SKU
+- **staging**: `walletwatchstagingacr` with Standard SKU
 - **prod**: `walletwatchprodacr` with Premium SKU
 
 ## GitHub Actions Workflows

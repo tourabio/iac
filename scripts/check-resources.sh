@@ -33,7 +33,7 @@ if [ "$ENVIRONMENT" == "dev" ]; then
     ACR_NAME="walletwatchdevacr"
 elif [ "$ENVIRONMENT" == "staging" ]; then
     RG_NAME="walletwatch-staging-rg"
-    ACR_NAME="walletwatchstgacr"
+    ACR_NAME="walletwatchstagingacr"
 elif [ "$ENVIRONMENT" == "prod" ]; then
     RG_NAME="walletwatch-prod-rg"
     ACR_NAME="walletwatchprodacr"

@@ -13,8 +13,8 @@ case $ENVIRONMENT in
     export ACR_SKU="Basic"
     ;;
   staging)
-    export RESOURCE_GROUP_NAME="walletwatch-stg-rg"
-    export ACR_NAME="walletwatchstgacr"
+    export RESOURCE_GROUP_NAME="walletwatch-staging-rg"
+    export ACR_NAME="walletwatchstagingacr"
     export LOCATION="East US"
     export ACR_SKU="Standard"
     ;;
