@@ -82,6 +82,46 @@ When configured properly:
 4. **Destruction needs extra safety** - More warnings, same approval mechanism
 5. **Professional IaC requires proper CI/CD** - Not just local development
 
+## Azure Permissions and Role Assignment Challenges
+
+### The Service Principal Authorization Issue
+
+**Key Finding:** Service principals created by users may not have sufficient permissions to create role assignments, even with Contributor access.
+
+**The Problem:**
+- AKS clusters need to pull images from Azure Container Registry (ACR)
+- This requires creating a role assignment for the AKS managed identity
+- Service principals need **User Access Administrator** role to create role assignments
+- Many organizations restrict this high-privilege role
+
+**Our Solutions:**
+
+**Option 1: Remove Role Assignment from Terraform**
+```hcl
+# Instead of automated role assignment in Terraform:
+resource "azurerm_role_assignment" "aks_acr_pull" {
+  principal_id         = azurerm_kubernetes_cluster.aks.kubelet_identity[0].object_id
+  role_definition_name = "AcrPull"
+  scope               = var.acr_id
+}
+
+# Use manual attachment after deployment:
+# az aks update -n <cluster-name> -g <resource-group> --attach-acr <acr-name>
+```
+
+**Option 2: Use System-Assigned Managed Identity**
+- AKS already uses `identity { type = "SystemAssigned" }`
+- Azure handles permissions automatically when using `az aks update --attach-acr`
+- No need for explicit role assignment resources
+
+### Key Lessons
+
+1. **Not all Azure operations can be automated** - Some require higher privileges
+2. **Manual steps aren't always bad** - Sometimes they're more secure
+3. **Azure CLI commands can handle permissions** - `--attach-acr` manages roles automatically
+4. **Separation of concerns works** - Infrastructure creation vs. permission assignment
+5. **Document manual steps clearly** - Include them in deployment runbooks
+
 ## Next Steps for Learning
 
 - Explore Terraform modules from the registry
@@ -89,3 +129,4 @@ When configured properly:
 - Practice with different cloud providers
 - Study advanced Terraform features (workspaces, remote state encryption)
 - Implement automated testing for infrastructure code
+- Research Azure RBAC best practices for automation accounts
