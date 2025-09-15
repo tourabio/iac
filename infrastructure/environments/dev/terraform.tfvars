@@ -17,4 +17,4 @@ aks_max_nodes           = 2
 
 # DNS Configuration
 domain_name        = "walletwatch.com"
-create_dns_records = false  # Set to true after NGINX LoadBalancer is deployed
+create_dns_records = true  # Set to true after NGINX LoadBalancer is deployed

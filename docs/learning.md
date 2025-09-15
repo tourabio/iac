@@ -29,6 +29,8 @@ We learned that Terraform needs somewhere to store its "state" - a record of wha
 infrastructure/
 ├── modules/           # Reusable components
 │   ├── acr/          # Azure Container Registry
+│   ├── aks/          # Azure Kubernetes Service
+│   ├── dns/          # DNS Zone and Records
 │   └── resource-group/
 ├── environments/     # Environment-specific configs
 │   ├── dev/
