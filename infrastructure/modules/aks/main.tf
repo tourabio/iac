@@ -38,9 +38,12 @@ resource "azurerm_kubernetes_cluster" "aks" {
 }
 
 # Grant AKS access to ACR
-resource "azurerm_role_assignment" "aks_acr_pull" {
-  principal_id                     = azurerm_kubernetes_cluster.aks.kubelet_identity[0].object_id
-  role_definition_name             = "AcrPull"
-  scope                            = var.acr_id
-  skip_service_principal_aad_check = true
-}
+# TODO: Uncomment after granting User Access Administrator role to service principal
+# Command for admin to run:
+# az role assignment create --assignee c408673e-9548-47fa-b2ba-c15194d75375 --role "User Access Administrator" --scope "/subscriptions/56637f11-5e83-404d-b6b3-04c7dab01412"
+# resource "azurerm_role_assignment" "aks_acr_pull" {
+#   principal_id                     = azurerm_kubernetes_cluster.aks.kubelet_identity[0].object_id
+#   role_definition_name             = "AcrPull"
+#   scope                            = var.acr_id
+#   skip_service_principal_aad_check = true
+# }
