@@ -4,6 +4,10 @@ terraform {
       source  = "hashicorp/azurerm"
       version = "~> 3.116.0"
     }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "~> 2.23.0"
+    }
   }
 
   required_version = ">= 1.0"
@@ -27,6 +31,13 @@ provider "azurerm" {
 
   # Use environment variables for authentication in GitHub Actions
   # ARM_CLIENT_ID, ARM_CLIENT_SECRET, ARM_TENANT_ID, ARM_SUBSCRIPTION_ID
+}
+
+provider "kubernetes" {
+  host                   = module.aks.kube_config.0.host
+  client_certificate     = base64decode(module.aks.kube_config.0.client_certificate)
+  client_key            = base64decode(module.aks.kube_config.0.client_key)
+  cluster_ca_certificate = base64decode(module.aks.kube_config.0.cluster_ca_certificate)
 }
 
 # Local values for common tags
