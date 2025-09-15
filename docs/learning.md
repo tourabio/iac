@@ -167,36 +167,33 @@ resource "azurerm_dns_a_record" "argocd" {
 }
 ```
 
-### Two-Phase Deployment Strategy
+### Single-Phase Deployment with Free Azure Domain
 
-**Phase 1: Infrastructure First**
-- Deploy AKS cluster, ACR, DNS zone
-- Set `create_dns_records = false`
-- Outputs DNS nameservers for domain delegation
-
-**Phase 2: Services and DNS Records**
-- Deploy ArgoCD/NGINX via GitOps workflow
-- Set `create_dns_records = true`
-- Terraform reads LoadBalancer IP and creates DNS records
+**Simplified Approach:**
+- Deploy AKS cluster, ACR, and free Azure public IP
+- Use Azure's cloudapp.azure.com domain (no ownership required)
+- ArgoCD accessible via: `argocd-dev-walletwatch.francecentral.cloudapp.azure.com`
+- No DNS delegation or domain purchase needed
 
 ### Key Architecture Decisions
 
-**Modular DNS Module:**
+**Modular Public DNS Module:**
 ```
-modules/dns/
-├── main.tf      # DNS zone and records
+modules/public-dns/
+├── main.tf      # Azure public IP with domain label
 ├── variables.tf # Configuration options
-└── outputs.tf   # Nameservers and FQDNs
+└── outputs.tf   # Public IP and Azure domain
 ```
 
-**Environment-Specific Domains:**
-- Dev: `argocd-dev.walletwatch.com`
-- Staging: `argocd-staging.walletwatch.com`
-- Prod: `argocd-prod.walletwatch.com`
+**Environment-Specific Azure Domains:**
+- Dev: `argocd-dev-walletwatch.francecentral.cloudapp.azure.com`
+- Staging: `argocd-staging-walletwatch.francecentral.cloudapp.azure.com`
+- Prod: `argocd-prod-walletwatch.francecentral.cloudapp.azure.com`
 
-**Conditional Resource Creation:**
-- Use `count` parameter to control when DNS records are created
-- Prevents chicken-and-egg problem with LoadBalancer dependencies
+**Simplified Architecture:**
+- Single public IP resource with domain label
+- No complex DNS zone management
+- Immediate domain availability
 
 ### Integration with Let's Encrypt
 
@@ -211,31 +208,33 @@ server:
   ingress:
     enabled: true
     hosts:
-      - argocd-dev.walletwatch.com
+      - argocd-dev-walletwatch.francecentral.cloudapp.azure.com
     annotations:
       cert-manager.io/cluster-issuer: "letsencrypt-prod"
 ```
 
 ### Key Lessons
 
-1. **Infrastructure dependencies matter** - DNS must exist before services can use it
+1. **Simplicity wins** - Free Azure domains avoid complexity of DNS delegation
 2. **Terraform data sources are powerful** - Read live Kubernetes state
-3. **Conditional resources solve timing issues** - Use `count` for optional resources
-4. **Domain ownership is required** - You must control the domain's nameservers
-5. **Two-phase deployment works** - Split infrastructure and application concerns
-6. **SSL automation requires proper DNS** - Let's Encrypt needs resolvable domains
+3. **Public IP with domain labels** - Azure provides free domain-like access
+4. **No domain ownership required** - Use cloudapp.azure.com subdomains
+5. **Single-phase deployment** - Everything deploys together
+6. **SSL automation works with Azure domains** - Let's Encrypt works with cloudapp.azure.com
 
 ### Operational Considerations
 
-**Domain Delegation Required:**
-- Configure domain registrar to use Azure DNS nameservers
-- Propagation can take 24-48 hours
-- Test with `nslookup` or `dig` commands
+**Free Azure Domain Benefits:**
+- No domain registration costs
+- Immediate availability (no propagation delay)
+- Automatic DNS resolution
+- Works globally with Azure infrastructure
 
 **Cost Implications:**
-- Azure DNS zone: ~$0.50/month per zone
-- DNS queries: $0.40 per million queries
-- Much cheaper than manual management overhead
+- Public IP: ~$4/month per static IP
+- No additional DNS costs
+- No domain registration fees
+- Total cost much lower than custom domains
 
 ## Next Steps for Learning
 
