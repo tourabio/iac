@@ -122,6 +122,119 @@ resource "azurerm_role_assignment" "aks_acr_pull" {
 4. **Separation of concerns works** - Infrastructure creation vs. permission assignment
 5. **Document manual steps clearly** - Include them in deployment runbooks
 
+## DNS and Domain Management with Terraform
+
+### The Challenge: External Access to Kubernetes Services
+
+**Key Finding:** Getting external access to Kubernetes applications requires proper DNS configuration, which can be automated with Terraform.
+
+**The Problem:**
+- Kubernetes services need external access (ArgoCD UI, application endpoints)
+- LoadBalancer services get dynamic IP addresses from cloud providers
+- Manual DNS configuration is error-prone and not reproducible
+- SSL certificates need proper domain names to work
+
+**Our Solution: Azure DNS Integration**
+
+**Step 1: DNS Zone Creation**
+```hcl
+resource "azurerm_dns_zone" "main" {
+  name                = var.domain_name
+  resource_group_name = var.resource_group_name
+  tags                = var.tags
+}
+```
+
+**Step 2: Dynamic DNS Records**
+```hcl
+# Get LoadBalancer IP from Kubernetes
+data "kubernetes_service" "nginx_ingress" {
+  metadata {
+    name      = "nginx-ingress-ingress-nginx-controller"
+    namespace = "nginx-ingress"
+  }
+}
+
+# Create A record pointing to LoadBalancer IP
+resource "azurerm_dns_a_record" "argocd" {
+  name                = "argocd-${var.environment}"
+  zone_name           = azurerm_dns_zone.main.name
+  resource_group_name = var.resource_group_name
+  ttl                 = 300
+  records             = [data.kubernetes_service.nginx_ingress.status.0.load_balancer.0.ingress.0.ip]
+}
+```
+
+### Two-Phase Deployment Strategy
+
+**Phase 1: Infrastructure First**
+- Deploy AKS cluster, ACR, DNS zone
+- Set `create_dns_records = false`
+- Outputs DNS nameservers for domain delegation
+
+**Phase 2: Services and DNS Records**
+- Deploy ArgoCD/NGINX via GitOps workflow
+- Set `create_dns_records = true`
+- Terraform reads LoadBalancer IP and creates DNS records
+
+### Key Architecture Decisions
+
+**Modular DNS Module:**
+```
+modules/dns/
+├── main.tf      # DNS zone and records
+├── variables.tf # Configuration options
+└── outputs.tf   # Nameservers and FQDNs
+```
+
+**Environment-Specific Domains:**
+- Dev: `argocd-dev.walletwatch.com`
+- Staging: `argocd-staging.walletwatch.com`
+- Prod: `argocd-prod.walletwatch.com`
+
+**Conditional Resource Creation:**
+- Use `count` parameter to control when DNS records are created
+- Prevents chicken-and-egg problem with LoadBalancer dependencies
+
+### Integration with Let's Encrypt
+
+**Automatic SSL Certificates:**
+- DNS records enable domain validation
+- Cert-Manager uses DNS records for ACME challenges
+- No manual certificate management needed
+
+**ArgoCD Configuration:**
+```yaml
+server:
+  ingress:
+    enabled: true
+    hosts:
+      - argocd-dev.walletwatch.com
+    annotations:
+      cert-manager.io/cluster-issuer: "letsencrypt-prod"
+```
+
+### Key Lessons
+
+1. **Infrastructure dependencies matter** - DNS must exist before services can use it
+2. **Terraform data sources are powerful** - Read live Kubernetes state
+3. **Conditional resources solve timing issues** - Use `count` for optional resources
+4. **Domain ownership is required** - You must control the domain's nameservers
+5. **Two-phase deployment works** - Split infrastructure and application concerns
+6. **SSL automation requires proper DNS** - Let's Encrypt needs resolvable domains
+
+### Operational Considerations
+
+**Domain Delegation Required:**
+- Configure domain registrar to use Azure DNS nameservers
+- Propagation can take 24-48 hours
+- Test with `nslookup` or `dig` commands
+
+**Cost Implications:**
+- Azure DNS zone: ~$0.50/month per zone
+- DNS queries: $0.40 per million queries
+- Much cheaper than manual management overhead
+
 ## Next Steps for Learning
 
 - Explore Terraform modules from the registry
@@ -130,3 +243,4 @@ resource "azurerm_role_assignment" "aks_acr_pull" {
 - Study advanced Terraform features (workspaces, remote state encryption)
 - Implement automated testing for infrastructure code
 - Research Azure RBAC best practices for automation accounts
+- Investigate advanced DNS patterns (wildcard certificates, multiple domains)

@@ -14,3 +14,7 @@ kubernetes_version      = "1.31.10"
 aks_enable_auto_scaling = true
 aks_min_nodes           = 1
 aks_max_nodes           = 2
+
+# DNS Configuration
+domain_name        = "walletwatch.com"
+create_dns_records = false  # Set to true after NGINX LoadBalancer is deployed

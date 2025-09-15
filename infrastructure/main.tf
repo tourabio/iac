@@ -84,3 +84,15 @@ module "aks" {
 
   depends_on = [module.acr]
 }
+
+# DNS Zone Module
+module "dns" {
+  source = "./modules/dns"
+
+  domain_name         = var.domain_name
+  resource_group_name = module.resource_group.name
+  environment         = var.environment
+  create_dns_records  = var.create_dns_records
+  aks_cluster_dependency = module.aks
+  tags                = local.common_tags
+}

@@ -14,6 +14,18 @@ variable "environment" {
   }
 }
 
+variable "domain_name" {
+  description = "Domain name for DNS zone"
+  type        = string
+  default     = "walletwatch.com"
+}
+
+variable "create_dns_records" {
+  description = "Whether to create DNS records (requires LoadBalancer to be deployed)"
+  type        = bool
+  default     = false
+}
+
 variable "resource_group_name" {
   description = "Name of the resource group"
   type        = string
