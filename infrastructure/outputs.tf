@@ -48,3 +48,19 @@ output "aks_tenant_id" {
   description = "Tenant ID of the AKS system assigned identity"
   value       = module.aks.tenant_id
 }
+
+# Public DNS Outputs (Free Azure Domain)
+output "argocd_public_ip" {
+  description = "Public IP address for ArgoCD"
+  value       = module.public_dns.public_ip
+}
+
+output "argocd_fqdn" {
+  description = "Free Azure domain for ArgoCD"
+  value       = module.public_dns.argocd_fqdn
+}
+
+output "argocd_url" {
+  description = "ArgoCD URL (Free Azure Domain)"
+  value       = module.public_dns.argocd_url
+}

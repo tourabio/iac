@@ -96,14 +96,12 @@ module "aks" {
   depends_on = [module.acr]
 }
 
-# DNS Zone Module
-module "dns" {
-  source = "./modules/dns"
+# Public DNS Module (Free Azure Domain)
+module "public_dns" {
+  source = "./modules/public-dns"
 
-  domain_name            = var.domain_name
-  resource_group_name    = module.resource_group.name
-  environment            = var.environment
-  create_dns_records     = var.create_dns_records
-  aks_cluster_dependency = module.aks
-  tags                   = local.common_tags
+  environment         = var.environment
+  resource_group_name = module.resource_group.name
+  location            = module.resource_group.location
+  tags                = local.common_tags
 }
