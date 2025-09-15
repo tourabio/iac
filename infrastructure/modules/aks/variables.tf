@@ -101,7 +101,7 @@ variable "load_balancer_sku" {
 variable "azure_policy_enabled" {
   description = "Enable Azure Policy for AKS cluster"
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "tags" {
