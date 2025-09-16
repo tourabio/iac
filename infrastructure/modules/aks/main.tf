@@ -37,13 +37,13 @@ resource "azurerm_kubernetes_cluster" "aks" {
   tags = var.tags
 }
 
-# Grant AKS access to ACR
-# TODO: Uncomment after granting User Access Administrator role to service principal
-# Command for admin to run:
-# az role assignment create --assignee c408673e-9548-47fa-b2ba-c15194d75375 --role "User Access Administrator" --scope "/subscriptions/56637f11-5e83-404d-b6b3-04c7dab01412"
-# resource "azurerm_role_assignment" "aks_acr_pull" {
-#   principal_id                     = azurerm_kubernetes_cluster.aks.kubelet_identity[0].object_id
-#   role_definition_name             = "AcrPull"
-#   scope                            = var.acr_id
-#   skip_service_principal_aad_check = true
-# }
+# Grant AKS access to ACR using attach method (no tenant-wide permissions needed)
+resource "null_resource" "attach_acr" {
+  count = var.acr_name != null ? 1 : 0
+
+  provisioner "local-exec" {
+    command = "az aks update -n ${azurerm_kubernetes_cluster.aks.name} -g ${var.resource_group_name} --attach-acr ${var.acr_name}"
+  }
+
+  depends_on = [azurerm_kubernetes_cluster.aks]
+}

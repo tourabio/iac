@@ -60,6 +60,12 @@ variable "acr_id" {
   type        = string
 }
 
+variable "acr_name" {
+  description = "Name of the Azure Container Registry for AKS attachment"
+  type        = string
+  default     = null
+}
+
 variable "os_disk_size_gb" {
   description = "OS disk size in GB for worker nodes"
   type        = number
