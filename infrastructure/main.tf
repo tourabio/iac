@@ -90,6 +90,7 @@ module "aks" {
   load_balancer_sku          = var.aks_load_balancer_sku
   azure_policy_enabled       = var.aks_azure_policy_enabled
   acr_id                     = module.acr.id
+  acr_name                   = module.acr.name
   log_analytics_workspace_id = var.log_analytics_workspace_id
   tags                       = local.common_tags
 
