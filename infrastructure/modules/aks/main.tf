@@ -37,13 +37,10 @@ resource "azurerm_kubernetes_cluster" "aks" {
   tags = var.tags
 }
 
-# Grant AKS access to ACR using attach method (no tenant-wide permissions needed)
-resource "null_resource" "attach_acr" {
-  count = var.acr_name != null ? 1 : 0
-
-  provisioner "local-exec" {
-    command = "az aks update -n ${azurerm_kubernetes_cluster.aks.name} -g ${var.resource_group_name} --attach-acr ${var.acr_name}"
-  }
-
-  depends_on = [azurerm_kubernetes_cluster.aks]
+# Grant AKS access to ACR using role assignment (no tenant-wide permissions needed)
+resource "azurerm_role_assignment" "aks_acr_pull" {
+  count                = var.acr_id != null ? 1 : 0
+  principal_id         = azurerm_kubernetes_cluster.aks.kubelet_identity[0].object_id
+  role_definition_name = "AcrPull"
+  scope               = var.acr_id
 }
