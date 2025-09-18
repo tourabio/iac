@@ -10,17 +10,17 @@ output "resource_group_location" {
 
 output "acr_name" {
   description = "Name of the Azure Container Registry"
-  value       = module.acr.name
+  value       = data.azurerm_container_registry.acr.name
 }
 
 output "acr_login_server" {
   description = "Login server URL for the Azure Container Registry"
-  value       = module.acr.login_server
+  value       = data.azurerm_container_registry.acr.login_server
 }
 
 output "acr_id" {
   description = "ID of the Azure Container Registry"
-  value       = module.acr.id
+  value       = data.azurerm_container_registry.acr.id
 }
 
 # AKS Outputs
@@ -39,14 +39,14 @@ output "aks_cluster_fqdn" {
   value       = module.aks.cluster_fqdn
 }
 
-output "aks_principal_id" {
-  description = "Principal ID of the AKS system assigned identity"
-  value       = module.aks.principal_id
+output "aks_kubelet_identity_principal_id" {
+  description = "Principal ID of the AKS kubelet user-assigned identity (static)"
+  value       = module.aks.kubelet_identity_principal_id
 }
 
-output "aks_tenant_id" {
-  description = "Tenant ID of the AKS system assigned identity"
-  value       = module.aks.tenant_id
+output "aks_kubelet_identity_client_id" {
+  description = "Client ID of the AKS kubelet user-assigned identity"
+  value       = module.aks.kubelet_identity_client_id
 }
 
 # Public DNS Outputs (Free Azure Domain)
