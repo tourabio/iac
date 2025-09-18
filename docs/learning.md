@@ -28,9 +28,8 @@ We learned that Terraform needs somewhere to store its "state" - a record of wha
 ```
 infrastructure/
 ├── modules/           # Reusable components
-│   ├── acr/          # Azure Container Registry
 │   ├── aks/          # Azure Kubernetes Service
-│   ├── dns/          # DNS Zone and Records
+│   ├── public-dns/   # Free Azure domain for ArgoCD
 │   └── resource-group/
 ├── environments/     # Environment-specific configs
 │   ├── dev/
@@ -302,11 +301,8 @@ data "azurerm_user_assigned_identity" "aks_kubelet" {
   resource_group_name = var.persistent_resource_group_name
 }
 
-# Reference existing ACR
-data "azurerm_container_registry" "acr" {
-  name                = var.acr_name
-  resource_group_name = var.persistent_resource_group_name
-}
+# ACR integration is handled outside of Terraform
+# AcrPull role assignment is done manually by admin
 
 # Configure AKS to use the static identity
 resource "azurerm_kubernetes_cluster" "aks" {

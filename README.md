@@ -1,6 +1,6 @@
 # WalletWatch Infrastructure as Code
 
-This repository contains Terraform infrastructure code for deploying Azure Container Registry (ACR) resources with GitHub Actions automation.
+This repository contains Terraform infrastructure code for deploying Azure Kubernetes Service (AKS) resources with GitHub Actions automation.
 
 ## 🏗️ Project Structure
 
@@ -10,7 +10,6 @@ This repository contains Terraform infrastructure code for deploying Azure Conta
 ├── docs/                       # Documentation
 ├── infrastructure/             # Terraform infrastructure code
 │   ├── modules/               # Reusable Terraform modules
-│   │   ├── acr/              # Azure Container Registry module
 │   │   └── resource-group/   # Resource Group module
 │   ├── environments/         # Environment-specific configurations
 │   │   ├── dev/             # Development environment
@@ -34,8 +33,8 @@ This repository contains Terraform infrastructure code for deploying Azure Conta
 ### Application Resources (Terraform Managed)
 Currently configured to deploy:
 - **Resource Groups**: Environment-specific (dev/staging/prod)
-- **Azure Container Registry**: Environment-specific ACR instances
-- **SKU Configuration**: Basic (dev), Standard (staging), Premium (prod)
+- **Azure Kubernetes Service**: Environment-specific AKS clusters
+- **Node Configuration**: Auto-scaling enabled with cost-effective VM sizes
 
 ## 🔐 GitHub Actions Secrets
 
@@ -119,9 +118,9 @@ See [GitHub Actions Setup Guide](docs/GITHUB_ACTIONS_SETUP.md) for automated dep
 
 Each environment has its own configuration in `infrastructure/environments/`:
 
-- **dev/**: Development environment with Basic ACR SKU
-- **staging/**: Staging environment with Standard ACR SKU  
-- **prod/**: Production environment with Premium ACR SKU
+- **dev/**: Development environment with single AKS node
+- **staging/**: Staging environment with auto-scaling (1-2 nodes)
+- **prod/**: Production environment with auto-scaling (1-3 nodes)
 
 ## 📚 Documentation
 
@@ -133,7 +132,8 @@ Each environment has its own configuration in `infrastructure/environments/`:
 The infrastructure is organized using Terraform modules for reusability and maintainability:
 
 - **Resource Group Module**: Manages Azure resource groups with consistent tagging
-- **ACR Module**: Configures Azure Container Registry with environment-specific settings
+- **AKS Module**: Configures Azure Kubernetes Service with auto-scaling and monitoring
+- **Public DNS Module**: Manages free Azure domain for ArgoCD access
 - **Main Configuration**: Orchestrates modules and providers
 
 ## 🔒 Security Features

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a professionally structured Terraform-based Infrastructure as Code (IaC) project for deploying Azure Container Registry (ACR) resources. The project follows best practices with modular architecture, environment separation, and automated CI/CD workflows.
+This is a professionally structured Terraform-based Infrastructure as Code (IaC) project for deploying Azure Kubernetes Service (AKS) resources. The project follows best practices with modular architecture, environment separation, and automated CI/CD workflows.
 
 ## Architecture
 
@@ -17,11 +17,12 @@ This is a professionally structured Terraform-based Infrastructure as Code (IaC)
 
 1. **Modules**: Reusable Terraform modules in `infrastructure/modules/`
    - `resource-group/`: Azure Resource Group module
-   - `acr/`: Azure Container Registry module with validation
+   - `aks/`: Azure Kubernetes Service module with auto-scaling
+   - `public-dns/`: Free Azure domain management for ArgoCD
 2. **Environments**: Environment-specific configurations
-   - `dev/`: Development with Basic SKU
-   - `staging/`: Staging with Standard SKU  
-   - `prod/`: Production with Premium SKU
+   - `dev/`: Development with single AKS node (auto-scaling 1-2)
+   - `staging/`: Staging with auto-scaling (1-2 nodes)
+   - `prod/`: Production with auto-scaling (1-3 nodes)
 3. **Main Configuration**: `infrastructure/main.tf` orchestrates modules
 4. **Scripts**: Utility scripts for deployment and destruction
 
@@ -59,10 +60,10 @@ terraform destroy -var-file="environments/dev/terraform.tfvars" -var="subscripti
 
 ## Environment Configuration
 
-Each environment has specific resource names and SKUs:
-- **dev**: `walletwatchdevacr` with Basic SKU
-- **staging**: `walletwatchstagingacr` with Standard SKU
-- **prod**: `walletwatchprodacr` with Premium SKU
+Each environment has specific AKS configurations:
+- **dev**: Single node with auto-scaling (1-2 nodes), Standard_B2s VMs
+- **staging**: Auto-scaling enabled (1-2 nodes), Standard_B2s VMs
+- **prod**: Auto-scaling enabled (1-3 nodes), Standard_B2s VMs
 
 ## GitHub Actions Workflows
 
