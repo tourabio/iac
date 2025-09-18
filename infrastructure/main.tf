@@ -58,16 +58,10 @@ module "resource_group" {
   tags                = local.common_tags
 }
 
-# Azure Container Registry Module
-module "acr" {
-  source = "./modules/acr"
-
-  acr_name            = var.acr_name
-  resource_group_name = module.resource_group.name
-  location            = module.resource_group.location
-  sku                 = var.acr_sku
-  admin_enabled       = var.acr_admin_enabled
-  tags                = local.common_tags
+# Azure Container Registry - Reference existing ACR created by admin
+data "azurerm_container_registry" "acr" {
+  name                = var.acr_name
+  resource_group_name = var.persistent_resource_group_name
 }
 
 # Azure Kubernetes Service Module
@@ -89,12 +83,12 @@ module "aks" {
   network_plugin             = var.aks_network_plugin
   load_balancer_sku          = var.aks_load_balancer_sku
   azure_policy_enabled       = var.aks_azure_policy_enabled
-  acr_id                     = module.acr.id
-  acr_name                   = module.acr.name
+  acr_id                     = data.azurerm_container_registry.acr.id
+  acr_name                   = data.azurerm_container_registry.acr.name
+  persistent_resource_group_name = var.persistent_resource_group_name
   log_analytics_workspace_id = var.log_analytics_workspace_id
   tags                       = local.common_tags
 
-  depends_on = [module.acr]
 }
 
 # Public DNS Module (Free Azure Domain)

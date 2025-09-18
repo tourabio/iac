@@ -16,3 +16,6 @@ aks_min_nodes           = 1
 aks_max_nodes           = 2
 
 # Using free Azure domain - no configuration needed
+
+# Persistent resources (pre-created by admin)
+persistent_resource_group_name = "walletwatch-dev-persistent-rg"

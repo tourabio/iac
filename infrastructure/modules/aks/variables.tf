@@ -115,3 +115,8 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "persistent_resource_group_name" {
+  description = "Name of the persistent resource group containing pre-created ACR and identity"
+  type        = string
+}

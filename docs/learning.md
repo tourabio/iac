@@ -245,3 +245,140 @@ server:
 - Implement automated testing for infrastructure code
 - Research Azure RBAC best practices for automation accounts
 - Investigate advanced DNS patterns (wildcard certificates, multiple domains)
+
+## Static Identity and Resource Management for AKS-ACR Integration
+
+### The Problem: Dynamic Resource IDs and Role Assignments
+
+**Key Finding:** When using Terraform to manage both AKS clusters and ACR access, destroying and recreating infrastructure causes role assignment issues because resource IDs change.
+
+**The Challenge:**
+- AKS kubelet identity gets a new `principal_id` every time the cluster is recreated
+- ACR resource ID changes if ACR is managed by the same Terraform state
+- Admin needs to manually re-grant ACR access after every `terraform destroy/apply` cycle
+- This breaks the "deploy once, works forever" principle
+
+### Our Solution: Persistent Resource Groups with Pre-Created Resources
+
+**Architecture Decision:**
+- Separate persistent resources (ACR, identity) from ephemeral resources (AKS cluster)
+- Admin creates resources once in persistent resource groups
+- Terraform references existing resources instead of creating them
+
+**Implementation:**
+
+**Step 1: Persistent Resource Group Strategy**
+```bash
+# Admin creates separate persistent resource groups per environment
+az group create --name "walletwatch-dev-persistent-rg" --location "France Central" --subscription "<subscription-id>"
+az group create --name "walletwatch-staging-persistent-rg" --location "West Europe" --subscription "<subscription-id>"
+az group create --name "walletwatch-prod-persistent-rg" --location "West Europe" --subscription "<subscription-id>"
+```
+
+**Step 2: Static ACR Creation**
+```bash
+# Create ACR in persistent resource group (one-time per environment)
+az acr create --name "walletwatchdevacr" --resource-group "walletwatch-dev-persistent-rg" --sku Basic --subscription "<subscription-id>"
+```
+
+**Step 3: Static Identity Creation and Role Assignment**
+```bash
+# Create static user-assigned managed identity
+az identity create --name "walletwatch-dev-aks-kubelet-identity" --resource-group "walletwatch-dev-persistent-rg" --subscription "<subscription-id>"
+
+# One-time role assignment (survives infrastructure recreation)
+az role assignment create \
+  --assignee $(az identity show --name "walletwatch-dev-aks-kubelet-identity" --resource-group "walletwatch-dev-persistent-rg" --subscription "<subscription-id>" --query "principalId" --output tsv) \
+  --role AcrPull \
+  --scope $(az acr show --name "walletwatchdevacr" --resource-group "walletwatch-dev-persistent-rg" --subscription "<subscription-id>" --query "id" --output tsv) \
+  --subscription "<subscription-id>"
+```
+
+**Step 4: Terraform References Existing Resources**
+```hcl
+# Reference existing User Assigned Managed Identity
+data "azurerm_user_assigned_identity" "aks_kubelet" {
+  name                = "${var.cluster_name}-kubelet-identity"
+  resource_group_name = var.persistent_resource_group_name
+}
+
+# Reference existing ACR
+data "azurerm_container_registry" "acr" {
+  name                = var.acr_name
+  resource_group_name = var.persistent_resource_group_name
+}
+
+# Configure AKS to use the static identity
+resource "azurerm_kubernetes_cluster" "aks" {
+  # ... other configuration
+
+  identity {
+    type         = "UserAssigned"
+    identity_ids = [data.azurerm_user_assigned_identity.aks_kubelet.id]
+  }
+
+  kubelet_identity {
+    client_id                 = data.azurerm_user_assigned_identity.aks_kubelet.client_id
+    object_id                 = data.azurerm_user_assigned_identity.aks_kubelet.principal_id
+    user_assigned_identity_id = data.azurerm_user_assigned_identity.aks_kubelet.id
+  }
+}
+```
+
+### Environment-Specific Configuration
+
+**Terraform Variables per Environment:**
+```hcl
+# infrastructure/environments/dev/terraform.tfvars
+persistent_resource_group_name = "walletwatch-dev-persistent-rg"
+
+# infrastructure/environments/staging/terraform.tfvars
+persistent_resource_group_name = "walletwatch-staging-persistent-rg"
+
+# infrastructure/environments/prod/terraform.tfvars
+persistent_resource_group_name = "walletwatch-prod-persistent-rg"
+```
+
+### Key Benefits of This Approach
+
+1. **True Infrastructure Immutability**: AKS clusters can be destroyed/recreated without breaking ACR access
+2. **Reduced Admin Overhead**: Role assignments happen once, not after every deployment
+3. **Environment Isolation**: Each environment has its own persistent resources
+4. **Cost Optimization**: Can destroy expensive compute resources (AKS) while keeping cheap storage resources (ACR)
+5. **Security Compliance**: Admin controls persistent resources, developers control ephemeral ones
+
+### Alternative Approaches Considered
+
+**Option 1: System-Assigned Identity + Manual Attachment**
+```bash
+# After cluster creation, admin runs:
+az aks update -n <cluster-name> -g <resource-group> --attach-acr <acr-name>
+```
+**Pros:** Azure handles role assignment automatically
+**Cons:** Still requires manual step after every cluster recreation
+
+**Option 2: Elevated Service Principal Permissions**
+- Grant service principal "User Access Administrator" role
+**Pros:** Fully automated role assignment
+**Cons:** High security risk, often rejected by enterprises
+
+### Operational Workflow
+
+**Admin Initial Setup (Once per Environment):**
+1. Create persistent resource group
+2. Create ACR in persistent resource group
+3. Create user-assigned managed identity in persistent resource group
+4. Grant AcrPull role to identity for ACR scope
+
+**Developer/CI/CD Operations (Repeatable):**
+1. Run `terraform apply` to create AKS cluster with existing identity
+2. Run `terraform destroy` to clean up temporary resources
+3. ACR access works immediately on cluster recreation
+
+### Key Lessons
+
+1. **Separate concerns by lifecycle**: Persistent vs. ephemeral resources need different management strategies
+2. **Resource group strategy matters**: Persistent resources need their own blast radius
+3. **Static identities enable automation**: Pre-created identities with fixed principal IDs solve role assignment challenges
+4. **Admin boundaries are good**: Clear separation between admin setup and developer operations
+5. **Document the one-time setup**: Critical for team onboarding and disaster recovery

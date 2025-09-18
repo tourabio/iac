@@ -1,3 +1,9 @@
+# Reference existing User Assigned Managed Identity created by admin in persistent RG
+data "azurerm_user_assigned_identity" "aks_kubelet" {
+  name                = "${var.cluster_name}-kubelet-identity"
+  resource_group_name = var.persistent_resource_group_name
+}
+
 resource "azurerm_kubernetes_cluster" "aks" {
   name                = var.cluster_name
   location            = var.location
@@ -22,7 +28,14 @@ resource "azurerm_kubernetes_cluster" "aks" {
   }
 
   identity {
-    type = "SystemAssigned"
+    type         = "UserAssigned"
+    identity_ids = [data.azurerm_user_assigned_identity.aks_kubelet.id]
+  }
+
+  kubelet_identity {
+    client_id                 = data.azurerm_user_assigned_identity.aks_kubelet.client_id
+    object_id                 = data.azurerm_user_assigned_identity.aks_kubelet.principal_id
+    user_assigned_identity_id = data.azurerm_user_assigned_identity.aks_kubelet.id
   }
 
   network_profile {
@@ -37,10 +50,5 @@ resource "azurerm_kubernetes_cluster" "aks" {
   tags = var.tags
 }
 
-# Grant AKS access to ACR using role assignment (no tenant-wide permissions needed)
-resource "azurerm_role_assignment" "aks_acr_pull" {
-  count                = var.acr_id != null ? 1 : 0
-  principal_id         = azurerm_kubernetes_cluster.aks.kubelet_identity[0].object_id
-  role_definition_name = "AcrPull"
-  scope               = var.acr_id
-}
+# NOTE: Admin needs to manually grant AcrPull role to the kubelet identity
+# Use the kubelet_identity_principal_id output to assign the role manually

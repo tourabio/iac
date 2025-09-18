@@ -14,7 +14,6 @@ variable "environment" {
   }
 }
 
-# Free Azure domain - no variables needed
 
 variable "resource_group_name" {
   description = "Name of the resource group"
@@ -129,4 +128,9 @@ variable "aks_azure_policy_enabled" {
   description = "Enable Azure Policy for AKS cluster"
   type        = bool
   default     = false
+}
+
+variable "persistent_resource_group_name" {
+  description = "Name of the persistent resource group containing pre-created ACR and identity"
+  type        = string
 }

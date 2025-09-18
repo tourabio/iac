@@ -14,3 +14,6 @@ kubernetes_version      = "1.28.3"
 aks_enable_auto_scaling = true
 aks_min_nodes           = 1
 aks_max_nodes           = 3
+
+# Persistent resources (pre-created by admin)
+persistent_resource_group_name = "walletwatch-prod-persistent-rg"

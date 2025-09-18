@@ -25,17 +25,17 @@ output "kube_config" {
   sensitive   = true
 }
 
-output "kubelet_identity" {
-  description = "Kubelet identity of the AKS cluster"
-  value       = azurerm_kubernetes_cluster.aks.kubelet_identity
+output "kubelet_identity_principal_id" {
+  description = "Principal ID of the kubelet user-assigned identity (static - admin pre-created)"
+  value       = data.azurerm_user_assigned_identity.aks_kubelet.principal_id
 }
 
-output "principal_id" {
-  description = "Principal ID of the system assigned identity"
-  value       = azurerm_kubernetes_cluster.aks.identity[0].principal_id
+output "kubelet_identity_client_id" {
+  description = "Client ID of the kubelet user-assigned identity"
+  value       = data.azurerm_user_assigned_identity.aks_kubelet.client_id
 }
 
-output "tenant_id" {
-  description = "Tenant ID of the system assigned identity"
-  value       = azurerm_kubernetes_cluster.aks.identity[0].tenant_id
+output "kubelet_identity_id" {
+  description = "Resource ID of the kubelet user-assigned identity"
+  value       = data.azurerm_user_assigned_identity.aks_kubelet.id
 }
