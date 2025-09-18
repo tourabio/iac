@@ -27,23 +27,6 @@ variable "location" {
   default     = "West Europe"
 }
 
-variable "acr_name" {
-  description = "Name of the Azure Container Registry"
-  type        = string
-  default     = "walletwatchacr"
-}
-
-variable "acr_sku" {
-  description = "SKU for the Azure Container Registry"
-  type        = string
-  default     = "Basic"
-}
-
-variable "acr_admin_enabled" {
-  description = "Enable admin user for ACR"
-  type        = bool
-  default     = false
-}
 
 # AKS Variables
 variable "aks_cluster_name" {

@@ -1,0 +1,36 @@
+name: 'Scheduled Infrastructure Cleanup'
+
+on:
+  schedule:
+    - cron: '0 20 * * *'  # 20:00 UTC = 21:00 UTC+1
+
+env:
+  ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+  ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+  ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+  ARM_ACCESS_KEY: ${{ secrets.ARM_ACCESS_KEY }}
+
+jobs:
+  cleanup:
+    name: 'Infrastructure Cleanup'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        environment: [dev, staging]
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: 1.5.0
+        terraform_wrapper: false
+
+    - name: Destroy infrastructure
+      run: |
+        cd infrastructure
+        terraform init
+        terraform destroy -auto-approve -var-file="environments/${{ matrix.environment }}/terraform.tfvars"

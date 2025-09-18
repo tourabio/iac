@@ -2,9 +2,6 @@
 environment         = "dev"
 resource_group_name = "walletwatch-dev-rg"
 location            = "France Central"
-acr_name            = "walletwatchdevacr"
-acr_sku             = "Basic"
-acr_admin_enabled   = false
 
 # AKS Configuration - Dev Environment
 aks_cluster_name        = "walletwatch-dev-aks"

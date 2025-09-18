@@ -2,9 +2,6 @@
 environment         = "staging"
 resource_group_name = "walletwatch-staging-rg"
 location            = "West Europe"
-acr_name            = "walletwatchstagingacr"
-acr_sku             = "Basic"
-acr_admin_enabled   = false
 
 # AKS Configuration - Staging Environment
 aks_cluster_name        = "walletwatch-staging-aks"

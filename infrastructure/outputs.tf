@@ -8,20 +8,6 @@ output "resource_group_location" {
   value       = module.resource_group.location
 }
 
-output "acr_name" {
-  description = "Name of the Azure Container Registry"
-  value       = data.azurerm_container_registry.acr.name
-}
-
-output "acr_login_server" {
-  description = "Login server URL for the Azure Container Registry"
-  value       = data.azurerm_container_registry.acr.login_server
-}
-
-output "acr_id" {
-  description = "ID of the Azure Container Registry"
-  value       = data.azurerm_container_registry.acr.id
-}
 
 # AKS Outputs
 output "aks_cluster_name" {

@@ -55,16 +55,6 @@ variable "log_analytics_workspace_id" {
   default     = null
 }
 
-variable "acr_id" {
-  description = "ID of the Azure Container Registry for AcrPull role assignment"
-  type        = string
-}
-
-variable "acr_name" {
-  description = "Name of the Azure Container Registry for AKS attachment"
-  type        = string
-  default     = null
-}
 
 variable "os_disk_size_gb" {
   description = "OS disk size in GB for worker nodes"

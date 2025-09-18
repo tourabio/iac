@@ -2,9 +2,6 @@
 environment         = "prod"
 resource_group_name = "walletwatch-prod-rg"
 location            = "West Europe"
-acr_name            = "walletwatchprodacr"
-acr_sku             = "Standard"
-acr_admin_enabled   = false
 
 # AKS Configuration - Production Environment
 aks_cluster_name        = "walletwatch-prod-aks"
