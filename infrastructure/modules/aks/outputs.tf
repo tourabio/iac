@@ -25,17 +25,3 @@ output "kube_config" {
   sensitive   = true
 }
 
-output "kubelet_identity_principal_id" {
-  description = "Principal ID of the kubelet user-assigned identity (static - admin pre-created)"
-  value       = data.azurerm_user_assigned_identity.aks_kubelet.principal_id
-}
-
-output "kubelet_identity_client_id" {
-  description = "Client ID of the kubelet user-assigned identity"
-  value       = data.azurerm_user_assigned_identity.aks_kubelet.client_id
-}
-
-output "kubelet_identity_id" {
-  description = "Resource ID of the kubelet user-assigned identity"
-  value       = data.azurerm_user_assigned_identity.aks_kubelet.id
-}

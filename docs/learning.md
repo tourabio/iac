@@ -378,3 +378,203 @@ az aks update -n <cluster-name> -g <resource-group> --attach-acr <acr-name>
 3. **Static identities enable automation**: Pre-created identities with fixed principal IDs solve role assignment challenges
 4. **Admin boundaries are good**: Clear separation between admin setup and developer operations
 5. **Document the one-time setup**: Critical for team onboarding and disaster recovery
+
+## AKS Control Plane Identity and Managed Identity Operator Permissions
+
+### The Problem: CustomKubeletIdentityMissingPermissionError
+
+**Key Finding:** When using separate user-assigned identities for AKS control plane and kubelet, the control plane identity needs "Managed Identity Operator" role on the kubelet identity.
+
+**The Error:**
+```
+Error: creating Kubernetes Cluster: performing CreateOrUpdate: unexpected status 400 (400 Bad Request) with response: {
+  "code": "CustomKubeletIdentityMissingPermissionError",
+  "message": "The cluster using user-assigned managed identity must be granted 'Managed Identity Operator' role to assign kubelet identity..."
+}
+```
+
+**Root Cause:**
+- AKS control plane identity needs permission to manage (assign/unassign) the kubelet identity
+- This is required when using user-assigned identities for both control plane and kubelet
+- Without this permission, AKS cannot configure the kubelet to use the specified identity
+
+### Our Solution: Separate Persistent User-Assigned Identities
+
+**Architecture Decision:**
+- Create separate user-assigned identities for control plane and kubelet
+- Both identities are persistent (survive terraform destroy/redeploy cycles)
+- Admin grants role assignment once, persists across all deployments
+
+**Implementation Steps:**
+
+**Step 1: Admin Creates Control Plane Identity**
+```bash
+# Create control plane identity in persistent resource group
+az identity create \
+  --name "walletwatch-dev-aks-controlplane-identity" \
+  --resource-group "walletwatch-dev-persistent-rg" \
+  --location "France Central"
+```
+
+**Step 2: Admin Creates Role Assignment (One-Time)**
+```bash
+# Grant control plane identity permission to manage kubelet identity
+az role assignment create \
+  --assignee <controlplane-identity-principal-id> \
+  --role "Managed Identity Operator" \
+  --scope "/subscriptions/<SUBSCRIPTION_ID>/resourceGroups/walletwatch-dev-persistent-rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/walletwatch-dev-aks-kubelet-identity"
+```
+
+**Step 3: Terraform References Both Identities**
+```hcl
+# Reference existing control plane identity
+data "azurerm_user_assigned_identity" "aks_controlplane" {
+  name                = "${var.cluster_name}-controlplane-identity"
+  resource_group_name = var.persistent_resource_group_name
+}
+
+# Reference existing kubelet identity
+data "azurerm_user_assigned_identity" "aks_kubelet" {
+  name                = "${var.cluster_name}-kubelet-identity"
+  resource_group_name = var.persistent_resource_group_name
+}
+
+# Configure AKS with separate identities
+resource "azurerm_kubernetes_cluster" "aks" {
+  # ... other configuration
+
+  identity {
+    type         = "UserAssigned"
+    identity_ids = [data.azurerm_user_assigned_identity.aks_controlplane.id]
+  }
+
+  kubelet_identity {
+    client_id                 = data.azurerm_user_assigned_identity.aks_kubelet.client_id
+    object_id                 = data.azurerm_user_assigned_identity.aks_kubelet.principal_id
+    user_assigned_identity_id = data.azurerm_user_assigned_identity.aks_kubelet.id
+  }
+}
+```
+
+### Complete Admin Setup Checklist
+
+**For Each Environment (dev/staging/prod):**
+
+1. **Create persistent resource group:**
+```bash
+az group create --name "walletwatch-<env>-persistent-rg" --location "<location>"
+```
+
+2. **Create kubelet identity (for ACR access):**
+```bash
+az identity create \
+  --name "walletwatch-<env>-aks-kubelet-identity" \
+  --resource-group "walletwatch-<env>-persistent-rg"
+```
+
+3. **Create control plane identity:**
+```bash
+az identity create \
+  --name "walletwatch-<env>-aks-controlplane-identity" \
+  --resource-group "walletwatch-<env>-persistent-rg"
+```
+
+4. **Create ACR (if not exists):**
+```bash
+az acr create \
+  --name "walletwatch<env>acr" \
+  --resource-group "walletwatch-<env>-persistent-rg" \
+  --sku <Basic|Standard|Premium>
+```
+
+5. **Grant ACR access to kubelet identity:**
+```bash
+az role assignment create \
+  --assignee <kubelet-identity-principal-id> \
+  --role "AcrPull" \
+  --scope <acr-resource-id>
+```
+
+6. **Grant Managed Identity Operator to control plane:**
+```bash
+az role assignment create \
+  --assignee <controlplane-identity-principal-id> \
+  --role "Managed Identity Operator" \
+  --scope <kubelet-identity-resource-id>
+```
+
+7. **Create Key Vault (optional):**
+```bash
+az keyvault create \
+  --name "walletwatch-<env>-kv" \
+  --resource-group "walletwatch-<env>-persistent-rg" \
+  --enable-rbac-authorization true
+```
+
+8. **Grant Key Vault access to kubelet identity (if using Key Vault):**
+```bash
+az role assignment create \
+  --assignee <kubelet-identity-principal-id> \
+  --role "Key Vault Secrets User" \
+  --scope <keyvault-resource-id>
+```
+
+### Role Assignment Summary
+
+**Required Role Assignments (Per Environment):**
+1. **Kubelet Identity → ACR**: "AcrPull" role (for container image access)
+2. **Control Plane Identity → Kubelet Identity**: "Managed Identity Operator" role (for AKS cluster creation)
+3. **Kubelet Identity → Key Vault**: "Key Vault Secrets User" role (optional, for secrets access)
+
+### Alternative Approaches Considered
+
+**Option 1: Use Same Identity for Both Control Plane and Kubelet**
+- Identity needs permission to manage itself
+- Simpler setup but architecturally less clean
+- Still requires admin role assignment
+
+**Option 2: System-Assigned Identity for Control Plane**
+- Control plane gets new identity every deployment
+- Requires admin to re-grant permissions after every terraform apply
+- Not suitable for frequent deployment cycles
+
+**Option 3: Elevated Service Principal Permissions**
+- Grant service principal "User Access Administrator" role
+- Fully automated but high security risk
+- Often rejected by enterprise security policies
+
+### Key Benefits of Our Approach
+
+1. **No Role Assignment Needed After Deployments**: All permissions are persistent
+2. **Clean Separation of Concerns**: Control plane and kubelet have separate identities
+3. **Environment Isolation**: Each environment has independent identity setup
+4. **Security Compliance**: Minimal permissions following principle of least privilege
+5. **Terraform Destroy Safety**: All role assignments survive infrastructure recreation
+
+### Integration with Key Vault
+
+**When using Azure Key Vault integration:**
+- Kubelet identity needs "Key Vault Secrets User" role on Key Vault
+- Key Vault should be created in persistent resource group
+- Role assignment persists through terraform destroy/redeploy cycles
+- No additional AKS configuration needed beyond standard identity setup
+
+### Troubleshooting
+
+**Common Issues:**
+1. **Wrong identity used**: Ensure control plane identity has the role, not kubelet identity
+2. **Scope mismatch**: Role assignment scope must be the kubelet identity resource ID
+3. **Principal ID vs Client ID confusion**: Use principal_id for role assignments, client_id for AKS configuration
+4. **Resource not found**: Ensure all identities exist in persistent resource group before terraform apply
+
+**Verification Commands:**
+```bash
+# Check role assignments on kubelet identity
+az role assignment list --assignee <kubelet-identity-principal-id>
+
+# Check role assignments on control plane identity
+az role assignment list --assignee <controlplane-identity-principal-id>
+
+# Verify identity exists
+az identity show --name "<identity-name>" --resource-group "<persistent-rg>"
+```

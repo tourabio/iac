@@ -4,6 +4,12 @@ data "azurerm_user_assigned_identity" "aks_kubelet" {
   resource_group_name = var.persistent_resource_group_name
 }
 
+# Reference existing Control Plane User Assigned Managed Identity created by admin in persistent RG
+data "azurerm_user_assigned_identity" "aks_controlplane" {
+  name                = "${var.cluster_name}-controlplane-identity"
+  resource_group_name = var.persistent_resource_group_name
+}
+
 resource "azurerm_kubernetes_cluster" "aks" {
   name                = var.cluster_name
   location            = var.location
@@ -29,7 +35,7 @@ resource "azurerm_kubernetes_cluster" "aks" {
 
   identity {
     type         = "UserAssigned"
-    identity_ids = [data.azurerm_user_assigned_identity.aks_kubelet.id]
+    identity_ids = [data.azurerm_user_assigned_identity.aks_controlplane.id]
   }
 
   kubelet_identity {
@@ -50,5 +56,11 @@ resource "azurerm_kubernetes_cluster" "aks" {
   tags = var.tags
 }
 
-# NOTE: Admin needs to manually grant AcrPull role to the kubelet identity
-# Use the kubelet_identity_principal_id output to assign the role manually
+# NOTE: Admin must manually create and configure persistent identities:
+# 1. Create kubelet identity in persistent RG
+# 2. Create control plane identity in persistent RG
+# 3. Grant control plane identity "Managed Identity Operator" role on kubelet identity
+# 4. Grant kubelet identity "AcrPull" role on ACR
+# 5. Grant kubelet identity "Key Vault Secrets User" role on Key Vault (if using KV)
+#
+# Principal IDs are available directly from Azure CLI or Portal (not exposed as outputs)

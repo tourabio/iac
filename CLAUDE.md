@@ -152,10 +152,57 @@ For each environment:
 - **State Management**: Backup and archiving strategies
 - **Tagging Strategy**: Consistent resource tagging
 
+## Required Admin Setup for Infrastructure
+
+### Pre-Created Persistent Resources
+
+The infrastructure requires the following manually created resources in persistent resource groups:
+
+**For Each Environment (dev/staging/prod):**
+
+1. **Persistent Resource Group**: `walletwatch-<env>-persistent-rg`
+2. **Kubelet Identity**: `walletwatch-<env>-aks-kubelet-identity` (for ACR access)
+3. **Control Plane Identity**: `walletwatch-<env>-aks-controlplane-identity` (for AKS management)
+4. **Azure Container Registry**: `walletwatch<env>acr` (manually created)
+5. **Key Vault**: `walletwatch-<env>-kv` (optional, for secrets management)
+
+### Required Role Assignments (One-Time Setup)
+
+**Critical Role Assignments by Admin:**
+1. **Control Plane Identity → Kubelet Identity**: "Managed Identity Operator" role
+   - Enables AKS cluster creation with user-assigned identities
+   - Required to solve CustomKubeletIdentityMissingPermissionError
+2. **Kubelet Identity → ACR**: "AcrPull" role (for container image access)
+3. **Kubelet Identity → Key Vault**: "Key Vault Secrets User" role (if using Key Vault)
+
+**Admin Commands Reference:**
+```bash
+# Grant control plane identity permission to manage kubelet identity
+az role assignment create \
+  --assignee <controlplane-identity-principal-id> \
+  --role "Managed Identity Operator" \
+  --scope "/subscriptions/<SUBSCRIPTION_ID>/resourceGroups/walletwatch-<env>-persistent-rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/walletwatch-<env>-aks-kubelet-identity"
+
+# Grant kubelet identity access to Key Vault
+az role assignment create \
+  --assignee <kubelet-identity-principal-id> \
+  --role "Key Vault Secrets User" \
+  --scope "/subscriptions/<SUBSCRIPTION_ID>/resourceGroups/walletwatch-<env>-persistent-rg/providers/Microsoft.KeyVault/vaults/walletwatch-<env>-kv"
+```
+
+### Why This Architecture
+
+- **Persistence**: All role assignments survive terraform destroy/redeploy cycles
+- **Security**: Minimal permissions following principle of least privilege
+- **Separation**: Control plane and kubelet have distinct identities and roles
+- **Admin Control**: Critical resources managed outside of developer terraform state
+
+See detailed setup instructions in `docs/learning.md` - "AKS Control Plane Identity and Managed Identity Operator Permissions" section.
+
 ## Documentation Requirements
 IMPORTANT: When adding new infrastructure resources or GitHub Actions secrets:
 1. ALWAYS update the README.md "🏗️ Provisioned Infrastructure" section
-2. ALWAYS update the README.md "🔐 GitHub Actions Secrets" section  
+2. ALWAYS update the README.md "🔐 GitHub Actions Secrets" section
 3. Document what each resource does and why it's needed
 4. Include instructions for obtaining secret values
 5. Keep the resource inventory current and accurate

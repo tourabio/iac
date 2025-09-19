@@ -25,15 +25,6 @@ output "aks_cluster_fqdn" {
   value       = module.aks.cluster_fqdn
 }
 
-output "aks_kubelet_identity_principal_id" {
-  description = "Principal ID of the AKS kubelet user-assigned identity (static)"
-  value       = module.aks.kubelet_identity_principal_id
-}
-
-output "aks_kubelet_identity_client_id" {
-  description = "Client ID of the AKS kubelet user-assigned identity"
-  value       = module.aks.kubelet_identity_client_id
-}
 
 # Public DNS Outputs (Free Azure Domain)
 output "argocd_public_ip" {
