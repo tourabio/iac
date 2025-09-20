@@ -13,13 +13,9 @@ env:
   ARM_ACCESS_KEY: ${{ secrets.ARM_ACCESS_KEY }}
 
 jobs:
-  cleanup:
-    name: 'Infrastructure Cleanup'
+  cleanup-dev:
+    name: 'Cleanup Dev Environment'
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        environment: [dev, staging]
-
     steps:
     - name: Checkout
       uses: actions/checkout@v4
@@ -30,8 +26,28 @@ jobs:
         terraform_version: 1.5.0
         terraform_wrapper: false
 
-    - name: Destroy infrastructure
+    - name: Destroy Dev Infrastructure
       run: |
         cd infrastructure
         terraform init
-        terraform destroy -auto-approve -var-file="environments/${{ matrix.environment }}/terraform.tfvars"
+        terraform destroy -auto-approve -var-file="environments/dev/terraform.tfvars"
+
+  cleanup-staging:
+    name: 'Cleanup Staging Environment'
+    runs-on: ubuntu-latest
+    needs: cleanup-dev
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: 1.5.0
+        terraform_wrapper: false
+
+    - name: Destroy Staging Infrastructure
+      run: |
+        cd infrastructure
+        terraform init
+        terraform destroy -auto-approve -var-file="environments/staging/terraform.tfvars"
