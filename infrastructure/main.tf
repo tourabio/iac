@@ -27,7 +27,7 @@ provider "azurerm" {
     }
   }
   subscription_id            = var.subscription_id
-  skip_provider_registration = true
+  skip_provider_registration = false
 
   # Use environment variables for authentication in GitHub Actions
   # ARM_CLIENT_ID, ARM_CLIENT_SECRET, ARM_TENANT_ID, ARM_SUBSCRIPTION_ID
@@ -38,6 +38,19 @@ provider "kubernetes" {
   client_certificate     = base64decode(module.aks.kube_config.0.client_certificate)
   client_key            = base64decode(module.aks.kube_config.0.client_key)
   cluster_ca_certificate = base64decode(module.aks.kube_config.0.cluster_ca_certificate)
+}
+
+# Required Resource Provider Registrations
+resource "azurerm_resource_provider_registration" "postgresql" {
+  name = "Microsoft.DBforPostgreSQL"
+}
+
+resource "azurerm_resource_provider_registration" "container_service" {
+  name = "Microsoft.ContainerService"
+}
+
+resource "azurerm_resource_provider_registration" "key_vault" {
+  name = "Microsoft.KeyVault"
 }
 
 # Local values for common tags
