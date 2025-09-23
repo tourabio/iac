@@ -1,4 +1,4 @@
-name: 'Scheduled Infrastructure Cleanup'
+name: '🕒 Scheduled Infrastructure Cleanup'
 
 on:
   schedule:
