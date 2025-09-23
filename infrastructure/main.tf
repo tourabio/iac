@@ -93,3 +93,36 @@ module "public_dns" {
   location            = module.resource_group.location
   tags                = local.common_tags
 }
+
+# PostgreSQL Flexible Server Module
+module "postgresql" {
+  source = "./modules/postgresql"
+
+  environment         = var.environment
+  resource_group_name = module.resource_group.name
+  location            = module.resource_group.location
+  postgresql_version             = var.postgresql_version
+  admin_username                 = var.postgresql_admin_username
+  database_name                  = var.postgresql_database_name
+  sku_name                       = var.postgresql_sku_name
+  storage_mb                     = var.postgresql_storage_mb
+  backup_retention_days          = var.postgresql_backup_retention_days
+  availability_zone              = var.postgresql_availability_zone
+  tags                           = local.common_tags
+}
+
+# Key Vault Secrets Module for Database Credentials
+module "keyvault_secrets" {
+  source = "./modules/keyvault-secrets"
+
+  environment                    = var.environment
+  persistent_resource_group_name = var.persistent_resource_group_name
+  database_host                  = module.postgresql.server_fqdn
+  database_port                  = "5432"
+  database_name                  = module.postgresql.database_name
+  database_username              = module.postgresql.admin_username
+  database_password              = module.postgresql.admin_password
+  tags                           = local.common_tags
+
+  depends_on = [module.postgresql]
+}

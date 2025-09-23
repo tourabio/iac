@@ -16,3 +16,12 @@ aks_max_nodes           = 2
 
 # Persistent resources (pre-created by admin)
 persistent_resource_group_name = "walletwatch-dev-persistent-rg"
+
+# PostgreSQL Configuration - Dev Environment (cost-optimized)
+postgresql_version               = "16"
+postgresql_admin_username        = "walletwatch_admin"
+postgresql_database_name         = "walletwatch"
+postgresql_sku_name             = "B_Standard_B1ms"     # Basic tier: 1 vCore, 2GB RAM
+postgresql_storage_mb           = 32768                 # 32GB minimum
+postgresql_backup_retention_days = 7                   # Minimum retention
+postgresql_availability_zone    = "1"

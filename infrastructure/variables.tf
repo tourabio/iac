@@ -117,3 +117,50 @@ variable "persistent_resource_group_name" {
   description = "Name of the persistent resource group containing pre-created ACR and identity"
   type        = string
 }
+
+# PostgreSQL Variables
+variable "postgresql_version" {
+  description = "PostgreSQL version"
+  type        = string
+  default     = "16"
+  validation {
+    condition     = contains(["13", "14", "15", "16"], var.postgresql_version)
+    error_message = "PostgreSQL version must be 13, 14, 15, or 16."
+  }
+}
+
+variable "postgresql_admin_username" {
+  description = "Administrator username for PostgreSQL"
+  type        = string
+  default     = "walletwatch_admin"
+}
+
+variable "postgresql_database_name" {
+  description = "Name of the database to create"
+  type        = string
+  default     = "walletwatch"
+}
+
+variable "postgresql_sku_name" {
+  description = "The SKU Name for the PostgreSQL Flexible Server (cost-optimized)"
+  type        = string
+  default     = "B_Standard_B1ms"
+}
+
+variable "postgresql_storage_mb" {
+  description = "Storage size in MB (32GB for cost efficiency)"
+  type        = number
+  default     = 32768
+}
+
+variable "postgresql_backup_retention_days" {
+  description = "Number of days to retain backups"
+  type        = number
+  default     = 7
+}
+
+variable "postgresql_availability_zone" {
+  description = "Availability zone for the PostgreSQL server"
+  type        = string
+  default     = "1"
+}

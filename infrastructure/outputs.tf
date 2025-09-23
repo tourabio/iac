@@ -41,3 +41,30 @@ output "argocd_url" {
   description = "ArgoCD URL (Free Azure Domain)"
   value       = module.public_dns.argocd_url
 }
+
+# PostgreSQL Outputs
+output "postgresql_server_name" {
+  description = "Name of the PostgreSQL Flexible Server"
+  value       = module.postgresql.server_name
+}
+
+output "postgresql_server_fqdn" {
+  description = "FQDN of the PostgreSQL Flexible Server"
+  value       = module.postgresql.server_fqdn
+}
+
+output "postgresql_database_name" {
+  description = "Name of the PostgreSQL database"
+  value       = module.postgresql.database_name
+}
+
+# Key Vault Secrets Outputs
+output "keyvault_secret_names" {
+  description = "Names of the database secrets stored in Key Vault"
+  value       = module.keyvault_secrets.secret_names
+}
+
+output "keyvault_id" {
+  description = "ID of the Key Vault containing database secrets"
+  value       = module.keyvault_secrets.key_vault_id
+}
