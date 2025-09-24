@@ -519,12 +519,24 @@ az role assignment create \
   --scope <keyvault-resource-id>
 ```
 
+9. **Grant Network access to AKS cluster identity (for LoadBalancer services):**
+```bash
+az role assignment create \
+  --assignee <aks-cluster-identity-principal-id> \
+  --role "Network Contributor" \
+  --scope "/subscriptions/<SUBSCRIPTION_ID>/resourceGroups/walletwatch-<env>-rg"
+```
+
 ### Role Assignment Summary
 
 **Required Role Assignments (Per Environment):**
 1. **Kubelet Identity → ACR**: "AcrPull" role (for container image access)
 2. **Control Plane Identity → Kubelet Identity**: "Managed Identity Operator" role (for AKS cluster creation)
 3. **Kubelet Identity → Key Vault**: "Key Vault Secrets User" role (optional, for secrets access)
+4. **AKS Cluster Identity → Resource Group**: "Network Contributor" role (for LoadBalancer public IP access)
+   - Enables LoadBalancer services to access and assign Azure public IPs
+   - Required for NGINX ingress controller external IP assignment
+   - Prevents "AuthorizationFailed" errors when creating LoadBalancer services
 
 ### Alternative Approaches Considered
 

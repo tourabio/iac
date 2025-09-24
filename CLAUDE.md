@@ -174,6 +174,10 @@ The infrastructure requires the following manually created resources in persiste
    - Required to solve CustomKubeletIdentityMissingPermissionError
 2. **Kubelet Identity → ACR**: "AcrPull" role (for container image access)
 3. **Kubelet Identity → Key Vault**: "Key Vault Secrets User" role (if using Key Vault)
+4. **AKS Cluster Identity → Resource Group**: "Network Contributor" role
+   - Enables LoadBalancer services to access and assign Azure public IPs
+   - Required for NGINX ingress controller external IP assignment
+   - Prevents "AuthorizationFailed" errors when creating LoadBalancer services
 
 **Admin Commands Reference:**
 ```bash
@@ -188,6 +192,12 @@ az role assignment create \
   --assignee <kubelet-identity-principal-id> \
   --role "Key Vault Secrets User" \
   --scope "/subscriptions/<SUBSCRIPTION_ID>/resourceGroups/walletwatch-<env>-persistent-rg/providers/Microsoft.KeyVault/vaults/walletwatch-<env>-kv"
+
+# Grant AKS cluster identity access to public IPs (for LoadBalancer services)
+az role assignment create \
+  --assignee <aks-cluster-identity-principal-id> \
+  --role "Network Contributor" \
+  --scope "/subscriptions/<SUBSCRIPTION_ID>/resourceGroups/walletwatch-<env>-rg"
 ```
 
 ### Why This Architecture
