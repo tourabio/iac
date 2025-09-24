@@ -40,18 +40,6 @@ provider "kubernetes" {
   cluster_ca_certificate = base64decode(module.aks.kube_config.0.cluster_ca_certificate)
 }
 
-# Required Resource Provider Registrations
-resource "azurerm_resource_provider_registration" "postgresql" {
-  name = "Microsoft.DBforPostgreSQL"
-}
-
-resource "azurerm_resource_provider_registration" "container_service" {
-  name = "Microsoft.ContainerService"
-}
-
-resource "azurerm_resource_provider_registration" "key_vault" {
-  name = "Microsoft.KeyVault"
-}
 
 # Local values for common tags
 locals {
