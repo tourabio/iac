@@ -24,10 +24,9 @@ env:
   ARM_ACCESS_KEY: ${{ secrets.ARM_ACCESS_KEY }}
 
 jobs:
-  destroy-infrastructure:
-    name: '🗑️ Destroy Infrastructure'
+  show-destroy-plan:
+    name: '📋 Show Destroy Plan'
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}-approval
 
     steps:
     # Setup and Initialization
@@ -45,7 +44,7 @@ jobs:
         cd infrastructure
         terraform init
 
-    # Pre-Destruction Validation
+    # Create and Display Destroy Plan
     - name: Create & Show Destroy Plan
       run: |
         cd infrastructure
@@ -57,13 +56,48 @@ jobs:
         echo "📋 Destroy plan details:"
         terraform show destroyplan
 
-    # Manual approval happens here due to environment protection rule
+        echo "⚠️ REVIEW THE PLAN ABOVE BEFORE APPROVING DESTRUCTION ⚠️"
+
+    - name: Upload Destroy Plan
+      uses: actions/upload-artifact@v4
+      with:
+        name: destroyplan-${{ inputs.environment }}
+        path: infrastructure/destroyplan
+        retention-days: 1
+
+  execute-destroy:
+    name: '🗑️ Execute Destruction'
+    runs-on: ubuntu-latest
+    needs: show-destroy-plan
+    environment: ${{ inputs.environment }}-approval
+
+    steps:
+    # Setup and Initialization
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: 1.5.0
+        terraform_wrapper: false
+
+    - name: Download Destroy Plan
+      uses: actions/download-artifact@v4
+      with:
+        name: destroyplan-${{ inputs.environment }}
+        path: infrastructure/
+
+    - name: Terraform Init
+      run: |
+        cd infrastructure
+        terraform init
 
     # Infrastructure Destruction
     - name: Apply Destroy Plan
       run: |
         cd infrastructure
-        echo "🗑️ Applying destroy plan..."
+        echo "🗑️ Applying destroy plan for ${{ inputs.environment }} environment..."
         terraform apply -auto-approve destroyplan
 
     # Post-Destruction Verification
@@ -72,4 +106,4 @@ jobs:
         cd infrastructure
         echo "✅ Verifying destruction completed successfully..."
         terraform show
-        echo "✅ Infrastructure destruction completed successfully"
+        echo "✅ Infrastructure destruction completed successfully for ${{ inputs.environment }}"
