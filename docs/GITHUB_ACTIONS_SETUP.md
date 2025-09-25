@@ -12,6 +12,7 @@ You need to configure the following secrets in your GitHub repository:
 2. **ARM_CLIENT_SECRET** - Azure Service Principal Secret
 3. **ARM_TENANT_ID** - Azure Tenant ID
 4. **ARM_SUBSCRIPTION_ID** - Azure Subscription ID
+5. **ARM_ACCESS_KEY** - Storage Account Access Key for Terraform backend
 
 ### How to Create Azure Service Principal
 
@@ -43,6 +44,12 @@ You need to configure the following secrets in your GitHub repository:
    - `tenant` → `ARM_TENANT_ID`
    - Your subscription ID → `ARM_SUBSCRIPTION_ID`
 
+5. **Get Storage Account Access Key:**
+   ```bash
+   az storage account keys list --resource-group terraform-state-rg --account-name tfstatewalletwatch --query '[0].value' --output tsv
+   ```
+   - Copy this value → `ARM_ACCESS_KEY`
+
 ### Adding Secrets to GitHub
 
 1. Go to your GitHub repository
@@ -52,51 +59,78 @@ You need to configure the following secrets in your GitHub repository:
 
 ## GitHub Environment Setup
 
-The deployment workflow uses a GitHub environment called `production` for manual approval.
+The deployment workflows use GitHub environments with manual approval for each target environment.
 
-### Create Environment:
+### Create Environments:
 
 1. Go to **Settings** → **Environments**
 2. Click **New environment**
-3. Name it `production`
-4. Configure **Required reviewers** (add yourself or team members)
-5. Save the environment
+3. Create the following environments:
+   - `dev-approval` (for development deployments)
+   - `staging-approval` (for staging deployments)
+   - `prod-approval` (for production deployments)
+4. For each environment:
+   - Configure **Required reviewers** (add yourself or team members)
+   - Save the environment
 
 ## Workflows Overview
 
-### 1. Deploy Infrastructure (`terraform-deploy.yml`)
+### 1. Create Infrastructure (`create-infrastructure.yml`)
 
-- **Trigger**: Manual dispatch
+- **Trigger**: Manual dispatch with environment selection
+- **Environment Selection**: Choose dev/staging/prod
 - **Steps**:
-  1. **Plan**: Creates Terraform plan and shows what will be created
-  2. **Apply**: Waits for manual approval, then applies the changes
+  1. **Validation**: Format check, validate, security scan
+  2. **Plan**: Creates Terraform plan and shows what will be created
+  3. **Approval**: Waits for manual approval in `{environment}-approval` environment
+  4. **Apply**: Applies the changes after approval
 - **Manual Approval**: Required before applying changes
 
-### 2. Destroy Infrastructure (`terraform-destroy.yml`)
+### 2. Destroy Infrastructure (`destroy-infrastructure.yml`)
 
-- **Trigger**: Manual dispatch with confirmation
-- **Safety**: Requires typing "destroy" to confirm
+- **Trigger**: Manual dispatch with environment selection
+- **Environment Selection**: Choose dev/staging/prod to destroy
 - **Steps**:
-  1. Shows destroy plan
-  2. Destroys all infrastructure
+  1. **Show Plan**: Creates and displays destroy plan
+  2. **Approval**: Waits for manual approval in `{environment}-approval` environment
+  3. **Execute**: Destroys infrastructure after approval
+- **Manual Approval**: Required before destruction
+
+### 3. Scheduled Cleanup (`scheduled-destroy-infrastructure.yml`)
+
+- **Trigger**: Scheduled (nightly at 20:00 UTC)
+- **Purpose**: Cost optimization by cleaning up dev and staging environments
+- **Steps**:
+  1. **Cleanup Dev**: Automatically destroys dev environment
+  2. **Cleanup Staging**: Automatically destroys staging environment (after dev)
+- **No Approval**: Fully automated for cost savings
 
 ## Usage
 
 ### Deploy Infrastructure:
 
 1. Go to **Actions** tab in your repository
-2. Select **Deploy Infrastructure** workflow
+2. Select **🚀 Deploy Infrastructure** workflow
 3. Click **Run workflow**
-4. Review the plan in the workflow summary
-5. Approve the deployment in the **production** environment
+4. Select target environment (dev/staging/prod)
+5. Review the plan in the workflow summary
+6. Approve the deployment in the **{environment}-approval** environment
 
 ### Destroy Infrastructure:
 
 1. Go to **Actions** tab in your repository
-2. Select **Destroy Infrastructure** workflow
+2. Select **🗑️ Destroy Infrastructure** workflow
 3. Click **Run workflow**
-4. Type `destroy` in the confirmation field
-5. Click **Run workflow**
+4. Select target environment (dev/staging/prod)
+5. Review the destroy plan
+6. Approve the destruction in the **{environment}-approval** environment
+
+### Monitor Scheduled Cleanup:
+
+1. Go to **Actions** tab in your repository
+2. Select **🕒 Scheduled Infrastructure Cleanup** workflow
+3. View automatic nightly cleanup runs (20:00 UTC)
+4. No manual intervention required - fully automated
 
 ## Security Notes
 

@@ -8,7 +8,7 @@ This is a professionally structured Terraform-based Infrastructure as Code (IaC)
 
 ## Architecture
 
-- **Provider**: Azure Resource Manager (AzureRM) v3.67.0
+- **Provider**: Azure Resource Manager (AzureRM) ~> 3.116.0
 - **Structure**: Modular Terraform with environment separation
 - **Deployment**: Enhanced GitHub Actions workflows with validation
 - **State Management**: Azure Storage Backend with versioning and encryption
@@ -16,15 +16,18 @@ This is a professionally structured Terraform-based Infrastructure as Code (IaC)
 ### Core Components
 
 1. **Modules**: Reusable Terraform modules in `infrastructure/modules/`
+   - `aks/`: Azure Kubernetes Service module with auto-scaling and persistent identities
+   - `postgresql/`: PostgreSQL Flexible Server with environment-specific SKUs
+   - `keyvault-secrets/`: Key Vault secrets management for database credentials
+   - `public-dns/`: Free Azure domain management for external access
+   - `dns/`, `domain/`: Additional DNS management capabilities
    - `resource-group/`: Azure Resource Group module
-   - `aks/`: Azure Kubernetes Service module with auto-scaling
-   - `public-dns/`: Free Azure domain management for ArgoCD
 2. **Environments**: Environment-specific configurations
-   - `dev/`: Development with single AKS node (auto-scaling 1-2)
-   - `staging/`: Staging with auto-scaling (1-2 nodes)
-   - `prod/`: Production with auto-scaling (1-3 nodes)
-3. **Main Configuration**: `infrastructure/main.tf` orchestrates modules
-4. **Scripts**: Utility scripts for deployment and destruction
+   - `dev/`: Development with single AKS node (auto-scaling 1-2), Basic PostgreSQL
+   - `staging/`: Staging with auto-scaling (1-2 nodes), Standard PostgreSQL
+   - `prod/`: Production with auto-scaling (1-3 nodes), Premium PostgreSQL
+3. **Main Configuration**: `infrastructure/main.tf` orchestrates modules with persistent resource groups
+4. **Workflows**: GitHub Actions for deployment, destruction, and scheduled cleanup
 
 ## Common Commands
 
@@ -32,10 +35,12 @@ This is a professionally structured Terraform-based Infrastructure as Code (IaC)
 
 Infrastructure deployment is handled through GitHub Actions workflows:
 
-1. **Manual deployment**: Use workflow dispatch in GitHub Actions
+1. **Manual deployment**: Use workflow dispatch for `create-infrastructure.yml`
 2. **Environment selection**: Choose dev/staging/prod in workflow
-3. **Monitoring**: Check deployment status in GitHub Actions tab
-4. **Workflow triggers**: Both create and destroy workflows are manually triggered only
+3. **Manual approval**: Required via `{environment}-approval` environments
+4. **Monitoring**: Check deployment status in GitHub Actions tab
+5. **Scheduled cleanup**: Automatic nightly cleanup of dev/staging at 20:00 UTC
+6. **Workflow triggers**: Create and destroy workflows are manually triggered only
 
 ### Direct Terraform Commands
 ```bash
@@ -113,21 +118,34 @@ For each environment:
 ### Destruction Workflow (`destroy-infrastructure.yml`)
 **Sections**:
 1. **Pre-Destruction Validation**: Resource checking and destroy planning
-2. **Infrastructure Destruction**: Safe destruction with backups
-3. **Edge Cases and Error Handling**: Handle empty states and errors
-4. **Post-Destruction Notifications**: Completion status and cleanup
+2. **Infrastructure Destruction**: Safe destruction with manual approval
+3. **Post-Destruction Verification**: Completion status and cleanup
+
+### Scheduled Cleanup Workflow (`scheduled-destroy-infrastructure.yml`)
+**Sections**:
+1. **Automated Dev Cleanup**: Nightly cleanup of dev environment (20:00 UTC)
+2. **Automated Staging Cleanup**: Sequential staging environment cleanup
+3. **Cost Optimization**: Prevents overnight resource costs in non-production environments
 
 ## Project Structure
 
 ```
 .
-├── .github/workflows/          # Enhanced GitHub Actions workflows
+├── .github/workflows/          # GitHub Actions workflows
+│   ├── create-infrastructure.yml     # Infrastructure deployment
+│   ├── destroy-infrastructure.yml    # Infrastructure destruction
+│   └── scheduled-destroy-infrastructure.yml  # Nightly cleanup
 ├── docs/                       # Documentation
 │   ├── GITHUB_ACTIONS_SETUP.md
-│   └── README.md
+│   └── learning.md
 ├── infrastructure/             # Terraform infrastructure code
 │   ├── modules/               # Reusable modules
-│   │   ├── acr/              # ACR module with validation
+│   │   ├── aks/              # Azure Kubernetes Service
+│   │   ├── dns/              # DNS zone management
+│   │   ├── domain/           # Domain configuration
+│   │   ├── keyvault-secrets/ # Key Vault secrets management
+│   │   ├── postgresql/       # PostgreSQL Flexible Server
+│   │   ├── public-dns/       # Public DNS with Azure domains
 │   │   └── resource-group/   # Resource Group module
 │   ├── environments/         # Environment-specific configs
 │   │   ├── dev/terraform.tfvars
@@ -136,9 +154,6 @@ For each environment:
 │   ├── main.tf               # Main configuration with modules
 │   ├── variables.tf          # Input variables with validation
 │   └── outputs.tf            # Module outputs
-├── scripts/                    # Utility scripts
-│   ├── deploy.sh              # Deployment script
-│   └── destroy.sh             # Destruction script
 └── README.md                  # Project overview
 ```
 

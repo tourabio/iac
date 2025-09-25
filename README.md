@@ -7,9 +7,20 @@ This repository contains Terraform infrastructure code for deploying Azure Kuber
 ```
 .
 ├── .github/workflows/          # GitHub Actions workflows
+│   ├── create-infrastructure.yml     # Infrastructure deployment
+│   ├── destroy-infrastructure.yml    # Infrastructure destruction
+│   └── scheduled-destroy-infrastructure.yml  # Nightly cleanup
 ├── docs/                       # Documentation
+│   ├── GITHUB_ACTIONS_SETUP.md      # GitHub Actions setup guide
+│   └── learning.md                  # Learning notes and discoveries
 ├── infrastructure/             # Terraform infrastructure code
 │   ├── modules/               # Reusable Terraform modules
+│   │   ├── aks/              # Azure Kubernetes Service
+│   │   ├── dns/              # DNS zone management
+│   │   ├── domain/           # Domain configuration
+│   │   ├── keyvault-secrets/ # Key Vault secrets management
+│   │   ├── postgresql/       # PostgreSQL Flexible Server
+│   │   ├── public-dns/       # Public DNS with Azure domains
 │   │   └── resource-group/   # Resource Group module
 │   ├── environments/         # Environment-specific configurations
 │   │   ├── dev/             # Development environment
@@ -18,7 +29,6 @@ This repository contains Terraform infrastructure code for deploying Azure Kuber
 │   ├── main.tf             # Main Terraform configuration
 │   ├── variables.tf        # Input variables
 │   └── outputs.tf          # Output values
-├── .github/workflows/       # GitHub Actions workflows
 └── CLAUDE.md              # Claude Code guidance
 ```
 
@@ -33,7 +43,11 @@ This repository contains Terraform infrastructure code for deploying Azure Kuber
 ### Application Resources (Terraform Managed)
 Currently configured to deploy:
 - **Resource Groups**: Environment-specific (dev/staging/prod)
-- **Azure Kubernetes Service**: Environment-specific AKS clusters
+- **Azure Kubernetes Service**: Environment-specific AKS clusters with auto-scaling
+- **PostgreSQL Flexible Server**: Managed database service with environment-specific SKUs
+- **Azure Container Registry**: Pre-created in persistent resource groups
+- **Key Vault Integration**: Secrets management with role-based access
+- **Public DNS**: Free Azure domain integration for external access
 - **Node Configuration**: Auto-scaling enabled with cost-effective VM sizes
 
 ## 🔐 GitHub Actions Secrets
@@ -48,9 +62,9 @@ ARM_ACCESS_KEY=<storage-account-access-key>
 ```
 
 ### How to Get Secret Values
-1. **Service Principal Credentials**: Create via `az ad sp create-for-rbac`
+1. **Service Principal Credentials**: Create via `az ad sp create-for-rbac --name "terraform-github-actions" --role="Contributor" --scopes="/subscriptions/YOUR_SUBSCRIPTION_ID"`
 2. **Tenant/Subscription IDs**: Found in Azure Portal → Azure Active Directory
-3. **ARM_ACCESS_KEY**: Azure Portal → Storage Account → Access Keys
+3. **ARM_ACCESS_KEY**: Azure Portal → Storage Account (`tfstatewalletwatch`) → Access Keys → key1 value
 
 ## 🚀 Quick Start
 
@@ -133,8 +147,11 @@ The infrastructure is organized using Terraform modules for reusability and main
 
 - **Resource Group Module**: Manages Azure resource groups with consistent tagging
 - **AKS Module**: Configures Azure Kubernetes Service with auto-scaling and monitoring
-- **Public DNS Module**: Manages free Azure domain for ArgoCD access
-- **Main Configuration**: Orchestrates modules and providers
+- **PostgreSQL Module**: Manages PostgreSQL Flexible Server with environment-specific configurations
+- **Key Vault Secrets Module**: Handles database credential management and secure storage
+- **Public DNS Module**: Manages free Azure domain for external service access
+- **DNS/Domain Modules**: Additional DNS management capabilities
+- **Main Configuration**: Orchestrates modules and providers with environment separation
 
 ## 🔒 Security Features
 
