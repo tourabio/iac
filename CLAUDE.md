@@ -156,15 +156,16 @@ For each environment:
 
 ### Pre-Created Persistent Resources
 
-The infrastructure requires the following manually created resources in persistent resource groups:
+The infrastructure requires the following manually created resources:
 
 **For Each Environment (dev/staging/prod):**
 
-1. **Persistent Resource Group**: `walletwatch-<env>-persistent-rg`
-2. **Kubelet Identity**: `walletwatch-<env>-aks-kubelet-identity` (for ACR access)
-3. **Control Plane Identity**: `walletwatch-<env>-aks-controlplane-identity` (for AKS management)
-4. **Azure Container Registry**: `walletwatch<env>acr` (manually created)
-5. **Key Vault**: `walletwatch-<env>-kv` (optional, for secrets management)
+1. **Persistent Resource Group**: `walletwatch-<env>-persistent-rg` (contains identities, ACR, Key Vault)
+2. **Main Resource Group**: `walletwatch-<env>-rg` (contains AKS, PostgreSQL, compute resources - manually created but referenced by Terraform)
+3. **Kubelet Identity**: `walletwatch-<env>-aks-kubelet-identity` (for ACR access)
+4. **Control Plane Identity**: `walletwatch-<env>-aks-controlplane-identity` (for AKS management)
+5. **Azure Container Registry**: `walletwatch<env>acr` (manually created)
+6. **Key Vault**: `walletwatch-<env>-kv` (optional, for secrets management)
 
 ### Required Role Assignments (One-Time Setup)
 
@@ -180,6 +181,20 @@ The infrastructure requires the following manually created resources in persiste
    - Prevents "AuthorizationFailed" errors when creating LoadBalancer services
 
 **Admin Commands Reference:**
+
+**Step 1: Create Main Resource Groups (One-Time)**
+```bash
+# Dev environment
+az group create --name "walletwatch-dev-rg" --location "France Central"
+
+# Staging environment
+az group create --name "walletwatch-staging-rg" --location "West Europe"
+
+# Production environment
+az group create --name "walletwatch-prod-rg" --location "West Europe"
+```
+
+**Step 2: Role Assignments (One-Time Per Environment)**
 ```bash
 # Grant control plane identity permission to manage kubelet identity
 az role assignment create \
@@ -193,11 +208,20 @@ az role assignment create \
   --role "Key Vault Secrets User" \
   --scope "/subscriptions/<SUBSCRIPTION_ID>/resourceGroups/walletwatch-<env>-persistent-rg/providers/Microsoft.KeyVault/vaults/walletwatch-<env>-kv"
 
-# Grant AKS cluster identity access to public IPs (for LoadBalancer services)
+# CRITICAL: Grant AKS control plane identity Network Contributor role (ONE-TIME SETUP)
 az role assignment create \
-  --assignee <aks-cluster-identity-principal-id> \
+  --assignee <controlplane-identity-principal-id> \
   --role "Network Contributor" \
   --scope "/subscriptions/<SUBSCRIPTION_ID>/resourceGroups/walletwatch-<env>-rg"
+```
+
+**Development Environment Example:**
+```bash
+# Replace with your actual values for dev environment
+az role assignment create \
+  --assignee "fa229838-37ee-454c-a3f6-d9b14130d90a" \
+  --role "Network Contributor" \
+  --scope "/subscriptions/56637f11-5e83-404d-b6b3-04c7dab01412/resourceGroups/walletwatch-dev-rg"
 ```
 
 ### Why This Architecture
@@ -206,6 +230,7 @@ az role assignment create \
 - **Security**: Minimal permissions following principle of least privilege
 - **Separation**: Control plane and kubelet have distinct identities and roles
 - **Admin Control**: Critical resources managed outside of developer terraform state
+- **nginx-ingress Reliability**: Network Contributor role on persistent main resource groups ensures LoadBalancer services work immediately after deployment
 
 See detailed setup instructions in `docs/learning.md` - "AKS Control Plane Identity and Managed Identity Operator Permissions" section.
 

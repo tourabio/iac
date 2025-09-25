@@ -235,6 +235,80 @@ server:
 - No domain registration fees
 - Total cost much lower than custom domains
 
+## Persistent Main Resource Groups: The Final Solution
+
+### The Problem: Role Assignment Scope Invalidation
+
+**Key Discovery:** Azure role assignments are tied to specific resource instance IDs, not just names. When Terraform destroys and recreates a resource group, even with the same name, it gets a new resource ID, which invalidates existing role assignments.
+
+**The Previous Approach Issues:**
+- Role assigned to: Identity → "Network Contributor" → `/subscriptions/.../resourceGroups/walletwatch-dev-rg` (Resource ID: xyz123)
+- `terraform destroy` → Resource Group with ID xyz123 deleted
+- `terraform apply` → New Resource Group created with same name but different ID: abc789
+- Role assignment still pointed to deleted resource ID xyz123
+- nginx-ingress LoadBalancer services failed with authorization errors
+
+### The Final Architecture Solution
+
+**Dual Resource Group Strategy:**
+1. **Persistent Resource Group**: `walletwatch-dev-persistent-rg` (identities, ACR, Key Vault)
+2. **Persistent Main Resource Group**: `walletwatch-dev-rg` (compute resources - manually created, Terraform references)
+
+**Implementation:**
+- **Admin creates main RG manually**: `az group create --name "walletwatch-dev-rg"`
+- **Admin assigns role once**: Identity → Network Contributor → Main RG scope
+- **Terraform references existing RG**: Uses `data "azurerm_resource_group"` instead of `resource`
+- **terraform destroy**: Only destroys resources inside RG, never the container RG
+- **Role assignments persist**: Same RG instance ID means role scopes remain valid
+
+### Technical Implementation
+
+**Before (Resource Creation):**
+```hcl
+resource "azurerm_resource_group" "default" {
+  name     = var.resource_group_name
+  location = var.location
+  tags     = var.tags
+}
+```
+
+**After (Data Source Reference):**
+```hcl
+# Reference existing manually created resource group
+data "azurerm_resource_group" "default" {
+  name = var.resource_group_name
+}
+```
+
+### Key Benefits Achieved
+
+1. **True Role Assignment Persistence**: Network Contributor role survives all terraform destroy/apply cycles
+2. **Immediate nginx-ingress Functionality**: LoadBalancer services work on first deployment without manual intervention
+3. **Developer Autonomy**: Can destroy/recreate infrastructure without admin involvement
+4. **Clean Separation**: Identities/ACR in persistent RGs, compute in main RGs
+5. **Environment Consistency**: Same pattern works across dev/staging/prod
+
+### Operational Workflow
+
+**Admin Setup (Once Per Environment):**
+1. Create main resource group manually: `az group create --name "walletwatch-dev-rg"`
+2. Assign Network Contributor role to control plane identity on main RG scope (one-time)
+
+**Developer/CI Operations (Repeatable):**
+1. Run `terraform apply` → Creates AKS, PostgreSQL, etc. in existing RG
+2. Run `terraform destroy` → Removes all resources but preserves container RG
+3. nginx-ingress works immediately on every deployment
+
+### Lessons Learned
+
+1. **Azure Resource IDs are immutable**: Resource recreation means new IDs and broken role assignments
+2. **Terraform state vs Azure state**: Terraform destroy doesn't always mean Azure resource deletion
+3. **Data sources enable persistence**: Reference existing resources instead of creating them
+4. **Role assignment scopes matter**: Persistent resources need persistent scopes
+5. **Admin boundaries solve complex problems**: Some resources are better managed outside automation
+
+This architecture finally solves the nginx-ingress authorization problem with a sustainable, scalable approach that works across all environments and deployment cycles.
+
 ## Next Steps for Learning
 
 - Explore Terraform modules from the registry
