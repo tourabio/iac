@@ -243,9 +243,8 @@ jobs:
       run: |
         cd infrastructure
         echo "rg_name=$(terraform output -raw resource_group_name)" >> $GITHUB_OUTPUT
-        echo "acr_name=$(terraform output -raw acr_name)" >> $GITHUB_OUTPUT
-        echo "acr_server=$(terraform output -raw acr_login_server)" >> $GITHUB_OUTPUT
-        echo "acr_id=$(terraform output -raw acr_id)" >> $GITHUB_OUTPUT
+        echo "aks_cluster_name=$(terraform output -raw aks_cluster_name)" >> $GITHUB_OUTPUT
+        echo "postgresql_server_name=$(terraform output -raw postgresql_server_name)" >> $GITHUB_OUTPUT
 
 
     - name: Create GitHub Release
@@ -258,11 +257,11 @@ jobs:
         release_name: Production Deployment ${{ github.run_number }}
         body: |
           ## 🚀 Production Infrastructure Deployment
-          
-          **ACR Name**: ${{ steps.outputs.outputs.acr_name }}
-          **ACR Server**: ${{ steps.outputs.outputs.acr_server }}
+
           **Resource Group**: ${{ steps.outputs.outputs.rg_name }}
-          
+          **AKS Cluster**: ${{ steps.outputs.outputs.aks_cluster_name }}
+          **PostgreSQL Server**: ${{ steps.outputs.outputs.postgresql_server_name }}
+
           Deployed on: $(date -u)
         draft: false
         prerelease: false
