@@ -13,8 +13,8 @@ terraform {
   required_version = ">= 1.0"
 
   backend "azurerm" {
-    resource_group_name  = "terraform-state-rg"
-    storage_account_name = "tfstatewalletwatch"
+    resource_group_name  = "terraform-state-francecentral-rg"
+    storage_account_name = "tfstatefrancecentralww"
     container_name       = "tfstate"
     key                  = "walletwatch.tfstate"
   }
