@@ -309,6 +309,152 @@ data "azurerm_resource_group" "default" {
 
 This architecture finally solves the nginx-ingress authorization problem with a sustainable, scalable approach that works across all environments and deployment cycles.
 
+## Terraform State Backend Migration: Geographic Consolidation
+
+### The Problem: State and Resources in Different Regions
+
+**Key Finding:** Having Terraform state backend in a different Azure region than deployed resources creates unnecessary latency and goes against data residency best practices.
+
+**Our Situation:**
+- **Original State Backend**: `terraform-state-rg` in West Europe with storage account `tfstatewalletwatch`
+- **Application Resources**: All environments (dev/staging/prod) deployed in France Central
+- **Impact**: Slower terraform operations due to cross-region state access
+
+### The Migration Process
+
+**Goal:** Move Terraform state backend from West Europe to France Central to match application resources location.
+
+**Step 1: Create New State Backend in France Central**
+```bash
+# Create new resource group in target region
+az group create \
+  --name "terraform-state-francecentral-rg" \
+  --location "France Central"
+
+# Create new storage account with versioning enabled
+az storage account create \
+  --name "tfstatefrancecentralww" \
+  --resource-group "terraform-state-francecentral-rg" \
+  --location "France Central" \
+  --sku "Standard_LRS" \
+  --kind "StorageV2" \
+  --allow-blob-public-access false \
+  --min-tls-version "TLS1_2"
+
+# Create container for state files
+az storage container create \
+  --name "tfstate" \
+  --account-name "tfstatefrancecentralww" \
+  --auth-mode login
+
+# Enable versioning for state file protection
+az storage account blob-service-properties update \
+  --account-name "tfstatefrancecentralww" \
+  --enable-versioning true
+
+# Get access key for GitHub Actions secret
+az storage account keys list \
+  --resource-group "terraform-state-francecentral-rg" \
+  --account-name "tfstatefrancecentralww" \
+  --query '[0].value' \
+  --output tsv
+```
+
+**Step 2: Update GitHub Actions Configuration**
+```bash
+# Update GitHub repository secret with new storage account access key
+# Repository Settings > Secrets and variables > Actions > ARM_ACCESS_KEY
+```
+
+**Step 3: Update Terraform Backend Configuration**
+```hcl
+# infrastructure/main.tf - Backend block update
+backend "azurerm" {
+  resource_group_name  = "terraform-state-francecentral-rg"  # Changed from "terraform-state-rg"
+  storage_account_name = "tfstatefrancecentralww"            # Changed from "tfstatewalletwatch"
+  container_name       = "tfstate"                          # Unchanged
+  key                  = "walletwatch.tfstate"              # Unchanged
+}
+```
+
+**Step 4: State Migration Execution**
+```bash
+# Navigate to Terraform configuration directory
+cd infrastructure
+
+# Initialize with new backend and migrate existing state
+terraform init -migrate-state
+
+# Verification: Confirm state migration was successful
+terraform plan -var-file="environments/dev/terraform.tfvars" -var="subscription_id=<YOUR_SUBSCRIPTION_ID>"
+```
+
+**Step 5: Cleanup Old Backend (After Verification)**
+```bash
+# After confirming successful migration and new backend works
+az group delete --name "terraform-state-rg" --yes
+```
+
+### Migration Success Indicators
+
+**Successful Migration Confirmed By:**
+1. **terraform init -migrate-state** completed without errors
+2. **terraform plan** executed successfully against new backend
+3. **State file visible** in new storage account container
+4. **GitHub Actions workflows** running successfully with new backend
+5. **All environment deployments** working normally
+
+### Key Benefits Achieved
+
+1. **Geographic Consistency**: State backend and application resources now both in France Central
+2. **Reduced Latency**: Faster Terraform operations due to regional proximity
+3. **Data Residency Compliance**: All infrastructure data consolidated in France Central
+4. **Simplified Disaster Recovery**: Single region for state and resources
+5. **Cost Optimization**: Potential reduction in data transfer costs
+
+### Migration Best Practices Learned
+
+1. **Always Test Migration First**: Use development environment to validate process
+2. **Backup Before Migration**: Keep old backend until new one is verified
+3. **Update GitHub Secrets Immediately**: Prevents workflow failures
+4. **Verify State Integrity**: Run terraform plan after migration to confirm state accuracy
+5. **Document Resource Changes**: Update README.md and documentation with new backend details
+6. **Clean Up Gradually**: Keep old backend for safety period before deletion
+
+### Security Considerations
+
+**Enhanced Security in New Backend:**
+- **Versioning enabled**: State file history preserved for rollback scenarios
+- **Blob public access disabled**: Enhanced security posture
+- **TLS 1.2 minimum**: Modern encryption standards enforced
+- **RBAC integration**: Better access control with Azure AD
+
+### Operational Impact
+
+**Post-Migration Improvements:**
+- **Faster deployment times**: Reduced cross-region latency
+- **Better monitoring**: All resources in same region for centralized monitoring
+- **Simplified compliance**: Single region for audit and compliance requirements
+- **Consistent resource naming**: Backend follows same regional naming convention
+
+### Alternative Migration Strategies Considered
+
+**Option 1: Fresh State (Not Chosen)**
+- Delete old state and redeploy infrastructure
+- **Pros**: Clean slate, no migration complexity
+- **Cons**: Resource recreation, potential service disruption
+
+**Option 2: State Import (Not Needed)**
+- Export resources and import to new backend
+- **Pros**: Granular control over migration
+- **Cons**: Complex for large infrastructures
+
+**Our Choice: Direct State Migration**
+- **Pros**: Preserves resource history, minimal disruption, straightforward process
+- **Cons**: Requires careful backup and verification steps
+
+This migration successfully consolidated our Terraform state management with our application resources in France Central, improving performance and operational consistency across all environments.
+
 ## Next Steps for Learning
 
 - Explore Terraform modules from the registry
