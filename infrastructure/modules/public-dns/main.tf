@@ -10,6 +10,14 @@ resource "azurerm_public_ip" "argocd" {
   domain_name_label   = "argocd-${var.environment}-walletwatch"
 
   tags = var.tags
+
+  # Ensure this IP is destroyed after the AKS cluster
+  depends_on = [var.aks_cluster_dependency]
+
+  lifecycle {
+    prevent_destroy = false
+    create_before_destroy = false
+  }
 }
 
 # Public IP for WalletWatch with DNS label for free domain-like access
@@ -24,6 +32,14 @@ resource "azurerm_public_ip" "walletwatch" {
   domain_name_label   = "walletwatch-${var.environment}"
 
   tags = var.tags
+
+  # Ensure this IP is destroyed after the AKS cluster
+  depends_on = [var.aks_cluster_dependency]
+
+  lifecycle {
+    prevent_destroy = false
+    create_before_destroy = false
+  }
 }
 
 # Output the free Azure domains

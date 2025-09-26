@@ -18,3 +18,9 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "aks_cluster_dependency" {
+  description = "Dependency on AKS cluster to ensure proper destroy order"
+  type        = any
+  default     = null
+}

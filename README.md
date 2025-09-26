@@ -35,8 +35,8 @@ This repository contains Terraform infrastructure code for deploying Azure Kuber
 ## 🏗️ Provisioned Infrastructure
 
 ### Backend Resources (Manually Created)
-- **Resource Group**: `terraform-state-rg` (West Europe)
-- **Storage Account**: `tfstatewalletwatch`
+- **Resource Group**: `terraform-state-francecentral-rg` (France Central)
+- **Storage Account**: `tfstatefrancecentralww`
 - **Storage Container**: `tfstate`
 - **Purpose**: Terraform remote state management with versioning and encryption
 
@@ -64,7 +64,7 @@ ARM_ACCESS_KEY=<storage-account-access-key>
 ### How to Get Secret Values
 1. **Service Principal Credentials**: Create via `az ad sp create-for-rbac --name "terraform-github-actions" --role="Contributor" --scopes="/subscriptions/YOUR_SUBSCRIPTION_ID"`
 2. **Tenant/Subscription IDs**: Found in Azure Portal → Azure Active Directory
-3. **ARM_ACCESS_KEY**: Azure Portal → Storage Account (`tfstatewalletwatch`) → Access Keys → key1 value
+3. **ARM_ACCESS_KEY**: Azure Portal → Storage Account (`tfstatefrancecentralww`) → Access Keys → key1 value
 
 ## 🚀 Quick Start
 

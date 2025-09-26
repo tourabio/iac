@@ -93,6 +93,7 @@ module "public_dns" {
   resource_group_name = module.resource_group.name
   location            = module.resource_group.location
   tags                = local.common_tags
+  aks_cluster_dependency = module.aks
 }
 
 # PostgreSQL Flexible Server Module
