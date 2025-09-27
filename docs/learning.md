@@ -95,25 +95,15 @@ When configured properly:
 - Service principals need **User Access Administrator** role to create role assignments
 - Many organizations restrict this high-privilege role
 
-**Our Solutions:**
+**Our Solution:**
 
-**Option 1: Remove Role Assignment from Terraform**
-```hcl
-# Instead of automated role assignment in Terraform:
-resource "azurerm_role_assignment" "aks_acr_pull" {
-  principal_id         = azurerm_kubernetes_cluster.aks.kubelet_identity[0].object_id
-  role_definition_name = "AcrPull"
-  scope               = var.acr_id
-}
-
-# Use manual attachment after deployment:
-# az aks update -n <cluster-name> -g <resource-group> --attach-acr <acr-name>
-```
-
-**Option 2: Use System-Assigned Managed Identity**
-- AKS already uses `identity { type = "SystemAssigned" }`
-- Azure handles permissions automatically when using `az aks update --attach-acr`
-- No need for explicit role assignment resources
+**Persistent User-Assigned Managed Identities with Admin Role Assignments**
+- Developer manually creates all persistent resources: resource groups, identities, ACR, Key Vault using Azure CLI
+- Admin only grants required role assignments once between the created resources
+- Admin grants control plane identity "Managed Identity Operator" role on kubelet identity
+- Admin grants kubelet identity "Key Vault Secrets User" role on the manually created Key Vault
+- Terraform references existing persistent resources instead of creating them
+- Service principal (created by admin) has Contributor access for ephemeral resource creation but not role assignment permissions
 
 ### Key Lessons
 
@@ -477,35 +467,37 @@ This migration successfully consolidated our Terraform state management with our
 - Admin needs to manually re-grant ACR access after every `terraform destroy/apply` cycle
 - This breaks the "deploy once, works forever" principle
 
-### Our Solution: Persistent Resource Groups with Pre-Created Resources
+### Our Solution: Persistent Resource Groups with Developer-Created Resources
 
 **Architecture Decision:**
 - Separate persistent resources (ACR, identity) from ephemeral resources (AKS cluster)
-- Admin creates resources once in persistent resource groups
-- Terraform references existing resources instead of creating them
+- Developer manually creates persistent resources once using Azure CLI
+- Admin only grants role assignments between the created resources
+- Terraform references existing persistent resources instead of creating them
 
 **Implementation:**
 
-**Step 1: Persistent Resource Group Strategy**
+**Step 1: Developer Creates Persistent Resource Groups**
 ```bash
-# Admin creates separate persistent resource groups per environment
+# Developer manually creates separate persistent resource groups per environment
 az group create --name "walletwatch-dev-persistent-rg" --location "France Central" --subscription "<subscription-id>"
 az group create --name "walletwatch-staging-persistent-rg" --location "West Europe" --subscription "<subscription-id>"
 az group create --name "walletwatch-prod-persistent-rg" --location "West Europe" --subscription "<subscription-id>"
 ```
 
-**Step 2: Static ACR Creation**
+**Step 2: Developer Creates Static ACR**
 ```bash
-# Create ACR in persistent resource group (one-time per environment)
+# Developer manually creates ACR in persistent resource group (one-time per environment)
 az acr create --name "walletwatchdevacr" --resource-group "walletwatch-dev-persistent-rg" --sku Basic --subscription "<subscription-id>"
 ```
 
-**Step 3: Static Identity Creation and Role Assignment**
+**Step 3: Developer Creates Static Identities, Admin Grants Roles**
 ```bash
-# Create static user-assigned managed identity
+# Developer manually creates static user-assigned managed identities
 az identity create --name "walletwatch-dev-aks-kubelet-identity" --resource-group "walletwatch-dev-persistent-rg" --subscription "<subscription-id>"
+az identity create --name "walletwatch-dev-aks-controlplane-identity" --resource-group "walletwatch-dev-persistent-rg" --subscription "<subscription-id>"
 
-# One-time role assignment (survives infrastructure recreation)
+# Admin performs one-time role assignments (survives infrastructure recreation)
 az role assignment create \
   --assignee $(az identity show --name "walletwatch-dev-aks-kubelet-identity" --resource-group "walletwatch-dev-persistent-rg" --subscription "<subscription-id>" --query "principalId" --output tsv) \
   --role AcrPull \
@@ -513,18 +505,18 @@ az role assignment create \
   --subscription "<subscription-id>"
 ```
 
-**Step 4: Terraform References Existing Resources**
+**Step 4: Terraform References Existing Persistent Resources**
 ```hcl
-# Reference existing User Assigned Managed Identity
+# Reference existing User Assigned Managed Identity (manually created by developer)
 data "azurerm_user_assigned_identity" "aks_kubelet" {
   name                = "${var.cluster_name}-kubelet-identity"
   resource_group_name = var.persistent_resource_group_name
 }
 
-# ACR integration is handled outside of Terraform
-# AcrPull role assignment is done manually by admin
+# Reference existing ACR (manually created by developer)
+# Role assignments are handled by admin outside of Terraform
 
-# Configure AKS to use the static identity
+# Configure AKS to use the persistent identity
 resource "azurerm_kubernetes_cluster" "aks" {
   # ... other configuration
 
@@ -621,22 +613,22 @@ Error: creating Kubernetes Cluster: performing CreateOrUpdate: unexpected status
 ### Our Solution: Separate Persistent User-Assigned Identities
 
 **Architecture Decision:**
-- Create separate user-assigned identities for control plane and kubelet
+- Developer manually creates separate user-assigned identities for control plane and kubelet using Azure CLI
 - Both identities are persistent (survive terraform destroy/redeploy cycles)
-- Admin grants role assignment once, persists across all deployments
+- Admin grants role assignment once between the created identities, persists across all deployments
 
 **Implementation Steps:**
 
-**Step 1: Admin Creates Control Plane Identity**
+**Step 1: Developer Creates Control Plane Identity**
 ```bash
-# Create control plane identity in persistent resource group
+# Developer manually creates control plane identity in persistent resource group
 az identity create \
   --name "walletwatch-dev-aks-controlplane-identity" \
   --resource-group "walletwatch-dev-persistent-rg" \
   --location "France Central"
 ```
 
-**Step 2: Admin Creates Role Assignment (One-Time)**
+**Step 2: Admin Grants Role Assignment (One-Time)**
 ```bash
 # Grant control plane identity permission to manage kubelet identity
 az role assignment create \
@@ -680,26 +672,26 @@ resource "azurerm_kubernetes_cluster" "aks" {
 
 **For Each Environment (dev/staging/prod):**
 
-1. **Create persistent resource group:**
+1. **Developer creates persistent resource group:**
 ```bash
 az group create --name "walletwatch-<env>-persistent-rg" --location "<location>"
 ```
 
-2. **Create kubelet identity (for ACR access):**
+2. **Developer creates kubelet identity (for ACR access):**
 ```bash
 az identity create \
   --name "walletwatch-<env>-aks-kubelet-identity" \
   --resource-group "walletwatch-<env>-persistent-rg"
 ```
 
-3. **Create control plane identity:**
+3. **Developer creates control plane identity:**
 ```bash
 az identity create \
   --name "walletwatch-<env>-aks-controlplane-identity" \
   --resource-group "walletwatch-<env>-persistent-rg"
 ```
 
-4. **Create ACR (if not exists):**
+4. **Developer creates ACR:**
 ```bash
 az acr create \
   --name "walletwatch<env>acr" \
@@ -723,7 +715,7 @@ az role assignment create \
   --scope <kubelet-identity-resource-id>
 ```
 
-7. **Create Key Vault (optional):**
+7. **Developer creates Key Vault:**
 ```bash
 az keyvault create \
   --name "walletwatch-<env>-kv" \
