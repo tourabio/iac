@@ -78,6 +78,16 @@ module "resource_group" {
 }
 
 
+# Public DNS Module (Free Azure Domain) - Created before AKS
+module "public_dns" {
+  source = "./modules/public-dns"
+
+  environment         = var.environment
+  resource_group_name = module.resource_group.name
+  location            = module.resource_group.location
+  tags                = local.common_tags
+}
+
 # Azure Kubernetes Service Module
 module "aks" {
   source = "./modules/aks"
@@ -101,18 +111,10 @@ module "aks" {
   log_analytics_workspace_id = var.log_analytics_workspace_id
   tags                       = local.common_tags
 
+  # Ensure AKS is destroyed before public IPs (correct dependency order)
+  depends_on = [module.public_dns]
 }
 
-# Public DNS Module (Free Azure Domain)
-module "public_dns" {
-  source = "./modules/public-dns"
-
-  environment         = var.environment
-  resource_group_name = module.resource_group.name
-  location            = module.resource_group.location
-  tags                = local.common_tags
-  aks_cluster_dependency = module.aks
-}
 
 # Azure Container Registry Module
 module "acr" {

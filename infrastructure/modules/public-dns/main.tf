@@ -11,8 +11,6 @@ resource "azurerm_public_ip" "argocd" {
 
   tags = var.tags
 
-  # Ensure this IP is destroyed after the AKS cluster
-  depends_on = [var.aks_cluster_dependency]
 
   lifecycle {
     prevent_destroy = false
@@ -33,8 +31,8 @@ resource "azurerm_public_ip" "walletwatch" {
 
   tags = var.tags
 
-  # Ensure this IP is destroyed after the AKS cluster
-  depends_on = [var.aks_cluster_dependency]
+  # Public IP should be created before AKS cluster uses it
+  # No depends_on needed - AKS cluster will reference these IPs
 
   lifecycle {
     prevent_destroy = false
