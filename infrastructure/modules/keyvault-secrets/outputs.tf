@@ -10,6 +10,10 @@ output "secret_names" {
     azurerm_key_vault_secret.database_port.name,
     azurerm_key_vault_secret.database_name.name,
     azurerm_key_vault_secret.database_username.name,
-    azurerm_key_vault_secret.database_password.name
+    azurerm_key_vault_secret.database_password.name,
+    azurerm_key_vault_secret.flyway_connect_user.name,
+    azurerm_key_vault_secret.flyway_connect_user_password.name,
+    azurerm_key_vault_secret.jwt_public_key.name,
+    azurerm_key_vault_secret.jwt_private_key.name
   ]
 }

@@ -8,6 +8,10 @@ terraform {
       source  = "hashicorp/kubernetes"
       version = "~> 2.23.0"
     }
+    tls = {
+      source  = "hashicorp/tls"
+      version = "~> 4.0.0"
+    }
   }
 
   required_version = ">= 1.0"
@@ -40,6 +44,20 @@ provider "kubernetes" {
   cluster_ca_certificate = base64decode(module.aks.kube_config.0.cluster_ca_certificate)
 }
 
+
+# JWT Key Generation
+resource "tls_private_key" "jwt_key" {
+  algorithm = "RSA"
+  rsa_bits  = 2048
+}
+
+# Convert RSA private key from PKCS#1 to PKCS#8 format (required by SmallRye JWT)
+# Using external data source to run OpenSSL conversion
+data "external" "jwt_private_key_pkcs8" {
+  program = ["bash", "-c", "echo '${tls_private_key.jwt_key.private_key_pem}' | openssl pkcs8 -topk8 -inform PEM -outform PEM -nocrypt | jq -Rs '{private_key: .}'"]
+
+  depends_on = [tls_private_key.jwt_key]
+}
 
 # Local values for common tags
 locals {
@@ -146,7 +164,7 @@ module "postgresql" {
   tags                           = local.common_tags
 }
 
-# Key Vault Secrets Module for Database Credentials
+# Key Vault Secrets Module for Database, Flyway, and JWT Credentials
 module "keyvault_secrets" {
   source = "./modules/keyvault-secrets"
 
@@ -158,7 +176,16 @@ module "keyvault_secrets" {
   database_name                  = module.postgresql.database_name
   database_username              = module.postgresql.admin_username
   database_password              = module.postgresql.admin_password
+
+  # Flyway credentials (reuse PostgreSQL admin credentials)
+  flyway_connect_user            = module.postgresql.admin_username
+  flyway_connect_user_password   = module.postgresql.admin_password
+
+  # JWT keys (base64 encoded for multiline content)
+  jwt_public_key                 = base64encode(tls_private_key.jwt_key.public_key_pem)
+  jwt_private_key                = base64encode(data.external.jwt_private_key_pkcs8.result.private_key)
+
   tags                           = local.common_tags
 
-  depends_on = [module.postgresql, module.keyvault]
+  depends_on = [module.postgresql, module.keyvault, tls_private_key.jwt_key, data.external.jwt_private_key_pkcs8]
 }
