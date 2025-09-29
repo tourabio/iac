@@ -151,6 +151,24 @@ az role assignment create \
   --assignee <controlplane-identity-principal-id> \
   --role "Network Contributor" \
   --scope "/subscriptions/SUBSCRIPTION_ID/resourceGroups/walletwatch-prod-rg"
+
+# 7. Kubelet Identity → Resource Group (Key Vault Crypto User) - for JWT signing operations
+az role assignment create \
+  --assignee <kubelet-identity-principal-id> \
+  --role "Key Vault Crypto User" \
+  --scope "/subscriptions/SUBSCRIPTION_ID/resourceGroups/walletwatch-prod-rg"
+
+# 8. Service Principal → Resource Group (Key Vault Crypto Officer) - for JWT key management via Terraform
+az role assignment create \
+  --assignee SERVICE_PRINCIPAL_ID \
+  --role "Key Vault Crypto Officer" \
+  --scope "/subscriptions/SUBSCRIPTION_ID/resourceGroups/walletwatch-prod-rg"
+
+# 9. User → Resource Group (Key Vault Crypto User) - for JWT key debugging and management
+az role assignment create \
+  --assignee <your-user-principal-id> \
+  --role "Key Vault Crypto User" \
+  --scope "/subscriptions/SUBSCRIPTION_ID/resourceGroups/walletwatch-prod-rg"
 ```
 
 ## Step 5: Verification Commands
