@@ -48,17 +48,17 @@ resource "azurerm_key_vault_secret" "flyway_connect_user_password" {
   tags         = var.tags
 }
 
-# JWT Secrets
-resource "azurerm_key_vault_secret" "jwt_public_key" {
-  name         = "jwt-public-key"
-  value        = var.jwt_public_key
+# JWT Key (RSA-2048 for signing and verification)
+resource "azurerm_key_vault_key" "jwt_signing_key" {
+  name         = "jwt-signing-key"
   key_vault_id = var.keyvault_id
-  tags         = var.tags
-}
+  key_type     = "RSA"
+  key_size     = 2048
 
-resource "azurerm_key_vault_secret" "jwt_private_key" {
-  name         = "jwt-private-key"
-  value        = var.jwt_private_key
-  key_vault_id = var.keyvault_id
-  tags         = var.tags
+  key_opts = [
+    "sign",
+    "verify"
+  ]
+
+  tags = var.tags
 }

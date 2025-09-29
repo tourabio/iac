@@ -12,8 +12,16 @@ output "secret_names" {
     azurerm_key_vault_secret.database_username.name,
     azurerm_key_vault_secret.database_password.name,
     azurerm_key_vault_secret.flyway_connect_user.name,
-    azurerm_key_vault_secret.flyway_connect_user_password.name,
-    azurerm_key_vault_secret.jwt_public_key.name,
-    azurerm_key_vault_secret.jwt_private_key.name
+    azurerm_key_vault_secret.flyway_connect_user_password.name
   ]
+}
+
+output "jwt_key_name" {
+  description = "Name of the JWT signing key"
+  value       = azurerm_key_vault_key.jwt_signing_key.name
+}
+
+output "jwt_key_id" {
+  description = "ID of the JWT signing key"
+  value       = azurerm_key_vault_key.jwt_signing_key.id
 }
