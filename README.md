@@ -62,7 +62,7 @@ ARM_ACCESS_KEY=<storage-account-access-key>
 ```
 
 ### How to Get Secret Values
-1. **Service Principal Credentials**: Create via `az ad sp create-for-rbac --name "terraform-github-actions" --role="Contributor" --scopes="/subscriptions/YOUR_SUBSCRIPTION_ID"`
+1. **Service Principal Credentials**: Create via `az ad sp create-for-rbac --name "terraform-github-actions" --role="Contributor" --scopes="/subscriptions/SUBSCRIPTION_ID"`
 2. **Tenant/Subscription IDs**: Found in Azure Portal → Azure Active Directory
 3. **ARM_ACCESS_KEY**: Azure Portal → Storage Account (`tfstatefrancecentralww`) → Access Keys → key1 value
 
@@ -99,29 +99,29 @@ ARM_ACCESS_KEY=<storage-account-access-key>
    terraform init
    
    # Plan deployment for development
-   terraform plan -var-file="environments/dev/terraform.tfvars" -var="subscription_id=YOUR_SUBSCRIPTION_ID"
+   terraform plan -var-file="environments/dev/terraform.tfvars" -var="subscription_id=SUBSCRIPTION_ID"
    
    # Apply changes
-   terraform apply -var-file="environments/dev/terraform.tfvars" -var="subscription_id=YOUR_SUBSCRIPTION_ID"
+   terraform apply -var-file="environments/dev/terraform.tfvars" -var="subscription_id=SUBSCRIPTION_ID"
    
    # View outputs
    terraform output
    
    # Destroy infrastructure
-   terraform destroy -var-file="environments/dev/terraform.tfvars" -var="subscription_id=YOUR_SUBSCRIPTION_ID"
+   terraform destroy -var-file="environments/dev/terraform.tfvars" -var="subscription_id=SUBSCRIPTION_ID"
    ```
 
 4. **Quick environment switching:**
    ```bash
    # For different environments, change the var-file path:
    # Development
-   terraform plan -var-file="environments/dev/terraform.tfvars" -var="subscription_id=YOUR_SUBSCRIPTION_ID"
+   terraform plan -var-file="environments/dev/terraform.tfvars" -var="subscription_id=SUBSCRIPTION_ID"
    
    # Staging
-   terraform plan -var-file="environments/staging/terraform.tfvars" -var="subscription_id=YOUR_SUBSCRIPTION_ID"
+   terraform plan -var-file="environments/staging/terraform.tfvars" -var="subscription_id=SUBSCRIPTION_ID"
    
    # Production
-   terraform plan -var-file="environments/prod/terraform.tfvars" -var="subscription_id=YOUR_SUBSCRIPTION_ID"
+   terraform plan -var-file="environments/prod/terraform.tfvars" -var="subscription_id=SUBSCRIPTION_ID"
    ```
 
 ### GitHub Actions Deployment

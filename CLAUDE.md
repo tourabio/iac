@@ -53,16 +53,16 @@ cd infrastructure/
 terraform init
 
 # Plan for specific environment
-terraform plan -var-file="environments/dev/terraform.tfvars" -var="subscription_id=YOUR_SUBSCRIPTION_ID"
+terraform plan -var-file="environments/dev/terraform.tfvars" -var="subscription_id=SUBSCRIPTION_ID"
 
 # Apply changes
-terraform apply -var-file="environments/dev/terraform.tfvars" -var="subscription_id=YOUR_SUBSCRIPTION_ID"
+terraform apply -var-file="environments/dev/terraform.tfvars" -var="subscription_id=SUBSCRIPTION_ID"
 
 # Show outputs
 terraform output
 
 # Destroy infrastructure
-terraform destroy -var-file="environments/dev/terraform.tfvars" -var="subscription_id=YOUR_SUBSCRIPTION_ID"
+terraform destroy -var-file="environments/dev/terraform.tfvars" -var="subscription_id=SUBSCRIPTION_ID"
 ```
 
 ## Environment Configuration
@@ -220,37 +220,37 @@ az group create --name "walletwatch-prod-rg" --location "West Europe"
 az role assignment create \
   --assignee <controlplane-identity-principal-id> \
   --role "Managed Identity Operator" \
-  --scope "/subscriptions/<SUBSCRIPTION_ID>/resourceGroups/walletwatch-<env>-rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/walletwatch-<env>-aks-kubelet-identity"
+  --scope "/subscriptions/SUBSCRIPTION_ID/resourceGroups/walletwatch-<env>-rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/walletwatch-<env>-aks-kubelet-identity"
 
 # 2. Grant kubelet identity ACR access at resource group level
 az role assignment create \
   --assignee <kubelet-identity-principal-id> \
   --role "AcrPull" \
-  --scope "/subscriptions/<SUBSCRIPTION_ID>/resourceGroups/walletwatch-<env>-rg"
+  --scope "/subscriptions/SUBSCRIPTION_ID/resourceGroups/walletwatch-<env>-rg"
 
 # 3. Grant kubelet identity Key Vault access at resource group level
 az role assignment create \
   --assignee <kubelet-identity-principal-id> \
   --role "Key Vault Secrets User" \
-  --scope "/subscriptions/<SUBSCRIPTION_ID>/resourceGroups/walletwatch-<env>-rg"
+  --scope "/subscriptions/SUBSCRIPTION_ID/resourceGroups/walletwatch-<env>-rg"
 
 # 4. Grant service principal Key Vault management access at resource group level
 az role assignment create \
   --assignee <service-principal-id> \
   --role "Key Vault Secrets Officer" \
-  --scope "/subscriptions/<SUBSCRIPTION_ID>/resourceGroups/walletwatch-<env>-rg"
+  --scope "/subscriptions/SUBSCRIPTION_ID/resourceGroups/walletwatch-<env>-rg"
 
 # 5. Grant user Key Vault management access at resource group level (optional)
 az role assignment create \
   --assignee <user-principal-id> \
   --role "Key Vault Secrets Officer" \
-  --scope "/subscriptions/<SUBSCRIPTION_ID>/resourceGroups/walletwatch-<env>-rg"
+  --scope "/subscriptions/SUBSCRIPTION_ID/resourceGroups/walletwatch-<env>-rg"
 
 # 6. CRITICAL: Grant AKS control plane identity Network Contributor role (ONE-TIME SETUP)
 az role assignment create \
   --assignee <controlplane-identity-principal-id> \
   --role "Network Contributor" \
-  --scope "/subscriptions/<SUBSCRIPTION_ID>/resourceGroups/walletwatch-<env>-rg"
+  --scope "/subscriptions/SUBSCRIPTION_ID/resourceGroups/walletwatch-<env>-rg"
 ```
 
 ### Why This Architecture

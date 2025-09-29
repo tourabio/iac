@@ -376,7 +376,7 @@ cd infrastructure
 terraform init -migrate-state
 
 # Verification: Confirm state migration was successful
-terraform plan -var-file="environments/dev/terraform.tfvars" -var="subscription_id=<YOUR_SUBSCRIPTION_ID>"
+terraform plan -var-file="environments/dev/terraform.tfvars" -var="subscription_id=SUBSCRIPTION_ID"
 ```
 
 **Step 5: Cleanup Old Backend (After Verification)**
@@ -480,29 +480,29 @@ This migration successfully consolidated our Terraform state management with our
 **Step 1: Developer Creates Persistent Resource Groups**
 ```bash
 # Developer manually creates separate persistent resource groups per environment
-az group create --name "walletwatch-dev-persistent-rg" --location "France Central" --subscription "<subscription-id>"
-az group create --name "walletwatch-staging-persistent-rg" --location "West Europe" --subscription "<subscription-id>"
-az group create --name "walletwatch-prod-persistent-rg" --location "West Europe" --subscription "<subscription-id>"
+az group create --name "walletwatch-dev-persistent-rg" --location "France Central" --subscription "SUBSCRIPTION_ID"
+az group create --name "walletwatch-staging-persistent-rg" --location "West Europe" --subscription "SUBSCRIPTION_ID"
+az group create --name "walletwatch-prod-persistent-rg" --location "West Europe" --subscription "SUBSCRIPTION_ID"
 ```
 
 **Step 2: Developer Creates Static ACR**
 ```bash
 # Developer manually creates ACR in persistent resource group (one-time per environment)
-az acr create --name "walletwatchdevacr" --resource-group "walletwatch-dev-persistent-rg" --sku Basic --subscription "<subscription-id>"
+az acr create --name "walletwatchdevacr" --resource-group "walletwatch-dev-persistent-rg" --sku Basic --subscription "SUBSCRIPTION_ID"
 ```
 
 **Step 3: Developer Creates Static Identities, Admin Grants Roles**
 ```bash
 # Developer manually creates static user-assigned managed identities
-az identity create --name "walletwatch-dev-aks-kubelet-identity" --resource-group "walletwatch-dev-persistent-rg" --subscription "<subscription-id>"
-az identity create --name "walletwatch-dev-aks-controlplane-identity" --resource-group "walletwatch-dev-persistent-rg" --subscription "<subscription-id>"
+az identity create --name "walletwatch-dev-aks-kubelet-identity" --resource-group "walletwatch-dev-persistent-rg" --subscription "SUBSCRIPTION_ID"
+az identity create --name "walletwatch-dev-aks-controlplane-identity" --resource-group "walletwatch-dev-persistent-rg" --subscription "SUBSCRIPTION_ID"
 
 # Admin performs one-time role assignments (survives infrastructure recreation)
 az role assignment create \
-  --assignee $(az identity show --name "walletwatch-dev-aks-kubelet-identity" --resource-group "walletwatch-dev-persistent-rg" --subscription "<subscription-id>" --query "principalId" --output tsv) \
+  --assignee $(az identity show --name "walletwatch-dev-aks-kubelet-identity" --resource-group "walletwatch-dev-persistent-rg" --subscription "SUBSCRIPTION_ID" --query "principalId" --output tsv) \
   --role AcrPull \
-  --scope $(az acr show --name "walletwatchdevacr" --resource-group "walletwatch-dev-persistent-rg" --subscription "<subscription-id>" --query "id" --output tsv) \
-  --subscription "<subscription-id>"
+  --scope $(az acr show --name "walletwatchdevacr" --resource-group "walletwatch-dev-persistent-rg" --subscription "SUBSCRIPTION_ID" --query "id" --output tsv) \
+  --subscription "SUBSCRIPTION_ID"
 ```
 
 **Step 4: Terraform References Existing Persistent Resources**
@@ -634,7 +634,7 @@ az identity create \
 az role assignment create \
   --assignee <controlplane-identity-principal-id> \
   --role "Managed Identity Operator" \
-  --scope "/subscriptions/<SUBSCRIPTION_ID>/resourceGroups/walletwatch-dev-persistent-rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/walletwatch-dev-aks-kubelet-identity"
+  --scope "/subscriptions/SUBSCRIPTION_ID/resourceGroups/walletwatch-dev-persistent-rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/walletwatch-dev-aks-kubelet-identity"
 ```
 
 **Step 3: Terraform References Both Identities**
@@ -736,7 +736,7 @@ az role assignment create \
 az role assignment create \
   --assignee <aks-cluster-identity-principal-id> \
   --role "Network Contributor" \
-  --scope "/subscriptions/<SUBSCRIPTION_ID>/resourceGroups/walletwatch-<env>-rg"
+  --scope "/subscriptions/SUBSCRIPTION_ID/resourceGroups/walletwatch-<env>-rg"
 ```
 
 ### Role Assignment Summary
@@ -888,45 +888,45 @@ resource "azurerm_key_vault" "main" {
 az role assignment create \
   --assignee <kubelet-identity> \
   --role "AcrPull" \
-  --scope "/subscriptions/<id>/resourceGroups/walletwatch-dev-persistent-rg/providers/Microsoft.ContainerRegistry/registries/walletwatch<env>acr"
+  --scope "/subscriptions/SUBSCRIPTION_ID/resourceGroups/walletwatch-dev-persistent-rg/providers/Microsoft.ContainerRegistry/registries/walletwatch<env>acr"
 
 # Kubelet → Key Vault (specific resource)
 az role assignment create \
   --assignee <kubelet-identity> \
   --role "Key Vault Secrets User" \
-  --scope "/subscriptions/<id>/resourceGroups/walletwatch-dev-persistent-rg/providers/Microsoft.KeyVault/vaults/walletwatch-dev-kv"
+  --scope "/subscriptions/SUBSCRIPTION_ID/resourceGroups/walletwatch-dev-persistent-rg/providers/Microsoft.KeyVault/vaults/walletwatch-dev-kv"
 ```
 
 **New Approach (Resource Group-Level Permissions):**
 ```bash
 # Kubelet → Resource Group (covers all ACRs and Key Vaults)
 az role assignment create \
-  --assignee ea161ec0-3fb0-4d81-8323-3b969bd3cc28 \
+  --assignee KUBELET_IDENTITY_PRINCIPAL_ID \
   --role "AcrPull" \
-  --scope "/subscriptions/56637f11-5e83-404d-b6b3-04c7dab01412/resourceGroups/walletwatch-dev-rg"
+  --scope "/subscriptions/SUBSCRIPTION_ID/resourceGroups/walletwatch-dev-rg"
 
 az role assignment create \
-  --assignee ea161ec0-3fb0-4d81-8323-3b969bd3cc28 \
+  --assignee KUBELET_IDENTITY_PRINCIPAL_ID \
   --role "Key Vault Secrets User" \
-  --scope "/subscriptions/56637f11-5e83-404d-b6b3-04c7dab01412/resourceGroups/walletwatch-dev-rg"
+  --scope "/subscriptions/SUBSCRIPTION_ID/resourceGroups/walletwatch-dev-rg"
 
 # Service Principal → Resource Group (for managing secrets)
 az role assignment create \
-  --assignee c408673e-9548-47fa-b2ba-c15194d75375 \
+  --assignee SERVICE_PRINCIPAL_ID \
   --role "Key Vault Secrets Officer" \
-  --scope "/subscriptions/56637f11-5e83-404d-b6b3-04c7dab01412/resourceGroups/walletwatch-dev-rg"
+  --scope "/subscriptions/SUBSCRIPTION_ID/resourceGroups/walletwatch-dev-rg"
 
 # User → Resource Group (for manual management)
 az role assignment create \
-  --assignee cf71b9f7-6567-4438-a705-e7ff9aa623ea \
+  --assignee USER_PRINCIPAL_ID \
   --role "Key Vault Secrets Officer" \
-  --scope "/subscriptions/56637f11-5e83-404d-b6b3-04c7dab01412/resourceGroups/walletwatch-dev-rg"
+  --scope "/subscriptions/SUBSCRIPTION_ID/resourceGroups/walletwatch-dev-rg"
 
 # CRITICAL: Control Plane → Kubelet Identity (still specific resource)
 az role assignment create \
-  --assignee fa229838-37ee-454c-a3f6-d9b14130d90a \
+  --assignee CONTROLPLANE_IDENTITY_PRINCIPAL_ID \
   --role "Managed Identity Operator" \
-  --scope "/subscriptions/56637f11-5e83-404d-b6b3-04c7dab01412/resourceGroups/walletwatch-dev-rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/walletwatch-dev-aks-kubelet-identity"
+  --scope "/subscriptions/SUBSCRIPTION_ID/resourceGroups/walletwatch-dev-rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/walletwatch-dev-aks-kubelet-identity"
 ```
 
 **Step 3: Update Environment Configurations**
@@ -1012,10 +1012,10 @@ terraform destroy  # Destroys AKS/PostgreSQL/ACR/KeyVault = $0 overnight!
 2. **Import existing resources** into Terraform state:
 ```bash
 # Import existing ACR
-terraform import module.acr.azurerm_container_registry.main /subscriptions/<id>/resourceGroups/walletwatch-dev-rg/providers/Microsoft.ContainerRegistry/registries/walletwatch<env>acr
+terraform import module.acr.azurerm_container_registry.main /subscriptions/SUBSCRIPTION_ID/resourceGroups/walletwatch-dev-rg/providers/Microsoft.ContainerRegistry/registries/walletwatch<env>acr
 
 # Import existing Key Vault
-terraform import module.keyvault.azurerm_key_vault.main /subscriptions/<id>/resourceGroups/walletwatch-dev-rg/providers/Microsoft.KeyVault/vaults/walletwatch-dev-kv
+terraform import module.keyvault.azurerm_key_vault.main /subscriptions/SUBSCRIPTION_ID/resourceGroups/walletwatch-dev-rg/providers/Microsoft.KeyVault/vaults/walletwatch-dev-kv
 ```
 3. **Apply Terraform** to bring resources under management
 4. **Test deployment** to ensure role assignments work correctly
