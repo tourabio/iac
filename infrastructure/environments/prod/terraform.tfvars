@@ -16,12 +16,8 @@ aks_max_nodes           = 3
 persistent_resource_group_name = "walletwatch-prod-persistent-rg"
 
 # ACR Configuration - Production Environment
-acr_sku                         = "Premium"            # Premium tier for production
-acr_admin_enabled               = false                # Use managed identities
-acr_network_rule_set_enabled    = true                # Restrict network access for production
-acr_network_rule_default_action = "Deny"              # Deny by default, allow specific IPs
-acr_network_rule_ip_ranges      = []                  # Add specific IP ranges as needed
-acr_georeplications             = []                  # Configure georeplications as needed
+acr_sku           = "Premium"            # Premium tier for production
+acr_admin_enabled = false                # Use managed identities
 
 # Key Vault Configuration - Production Environment
 keyvault_sku_name                      = "premium"    # Premium tier for production

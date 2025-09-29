@@ -18,10 +18,8 @@ aks_max_nodes           = 2
 persistent_resource_group_name = "walletwatch-dev-persistent-rg"
 
 # ACR Configuration - Dev Environment
-acr_sku                         = "Basic"              # Basic tier for dev
-acr_admin_enabled               = false                # Use managed identities
-acr_network_rule_set_enabled    = false               # Allow all traffic for dev
-acr_georeplications             = []                   # No georeplications for Basic SKU
+acr_sku           = "Basic"              # Basic tier for dev
+acr_admin_enabled = false                # Use managed identities
 
 # Key Vault Configuration - Dev Environment
 keyvault_sku_name                      = "standard"   # Standard tier

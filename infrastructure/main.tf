@@ -105,10 +105,6 @@ module "acr" {
   location            = module.resource_group.location
   sku                 = var.acr_sku
   admin_enabled       = var.acr_admin_enabled
-  georeplications     = var.acr_georeplications
-  network_rule_set_enabled   = var.acr_network_rule_set_enabled
-  network_rule_default_action = var.acr_network_rule_default_action
-  network_rule_ip_ranges     = var.acr_network_rule_ip_ranges
   tags                = local.common_tags
 }
 

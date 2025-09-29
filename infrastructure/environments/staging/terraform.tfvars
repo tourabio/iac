@@ -16,10 +16,8 @@ aks_max_nodes           = 2
 persistent_resource_group_name = "walletwatch-staging-persistent-rg"
 
 # ACR Configuration - Staging Environment
-acr_sku                         = "Standard"           # Standard tier for staging
-acr_admin_enabled               = false                # Use managed identities
-acr_network_rule_set_enabled    = false               # Allow all traffic for staging
-acr_georeplications             = []                   # No georeplications
+acr_sku           = "Standard"           # Standard tier for staging
+acr_admin_enabled = false                # Use managed identities
 
 # Key Vault Configuration - Staging Environment
 keyvault_sku_name                      = "standard"   # Standard tier

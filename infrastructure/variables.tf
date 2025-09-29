@@ -182,36 +182,6 @@ variable "acr_admin_enabled" {
   default     = false
 }
 
-variable "acr_georeplications" {
-  description = "List of georeplications for the ACR (Premium SKU only)"
-  type = list(object({
-    location                = string
-    zone_redundancy_enabled = bool
-  }))
-  default = []
-}
-
-variable "acr_network_rule_set_enabled" {
-  description = "Enable network rule set for the ACR"
-  type        = bool
-  default     = false
-}
-
-variable "acr_network_rule_default_action" {
-  description = "Default action for ACR network rule set"
-  type        = string
-  default     = "Allow"
-  validation {
-    condition     = contains(["Allow", "Deny"], var.acr_network_rule_default_action)
-    error_message = "Default action must be Allow or Deny."
-  }
-}
-
-variable "acr_network_rule_ip_ranges" {
-  description = "List of IP ranges to allow access to ACR"
-  type        = list(string)
-  default     = []
-}
 
 # Key Vault Variables
 variable "keyvault_sku_name" {
