@@ -14,17 +14,18 @@ resource "azurerm_container_registry" "main" {
     }
   }
 
-  # Network access rules for enhanced security
+  # Network access rules for enhanced security (only for Premium SKU)
   dynamic "network_rule_set" {
-    for_each = var.network_rule_set_enabled ? [1] : []
+    for_each = var.network_rule_set_enabled && var.sku == "Premium" ? [1] : []
     content {
       default_action = var.network_rule_default_action
 
       dynamic "ip_rule" {
         for_each = var.network_rule_ip_ranges
+        iterator = ip
         content {
           action   = "Allow"
-          ip_range = ip_rule.value
+          ip_range = ip.value
         }
       }
     }

@@ -1,6 +1,6 @@
 output "key_vault_id" {
   description = "ID of the Key Vault"
-  value       = data.azurerm_key_vault.main.id
+  value       = var.keyvault_id
 }
 
 output "secret_names" {
