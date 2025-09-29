@@ -3,8 +3,13 @@ variable "environment" {
   type        = string
 }
 
-variable "persistent_resource_group_name" {
-  description = "Name of the persistent resource group containing the Key Vault"
+variable "resource_group_name" {
+  description = "Name of the resource group containing the Key Vault"
+  type        = string
+}
+
+variable "keyvault_id" {
+  description = "ID of the Key Vault to store secrets in"
   type        = string
 }
 

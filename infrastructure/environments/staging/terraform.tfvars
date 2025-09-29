@@ -15,6 +15,24 @@ aks_max_nodes           = 2
 # Persistent resources (pre-created by admin)
 persistent_resource_group_name = "walletwatch-staging-persistent-rg"
 
+# ACR Configuration - Staging Environment
+acr_sku                         = "Standard"           # Standard tier for staging
+acr_admin_enabled               = false                # Use managed identities
+acr_network_rule_set_enabled    = false               # Allow all traffic for staging
+acr_georeplications             = []                   # No georeplications
+
+# Key Vault Configuration - Staging Environment
+keyvault_sku_name                      = "standard"   # Standard tier
+keyvault_enabled_for_disk_encryption   = false        # Not needed for staging
+keyvault_enabled_for_deployment        = false        # Not needed for staging
+keyvault_enabled_for_template_deployment = false      # Not needed for staging
+keyvault_enable_rbac_authorization     = true         # Use RBAC for access control
+keyvault_soft_delete_retention_days    = 14           # Extended retention for staging
+keyvault_purge_protection_enabled      = false        # Not needed for staging
+keyvault_network_acls_default_action   = "Allow"      # Allow all traffic for staging
+keyvault_network_acls_bypass           = "AzureServices"
+keyvault_network_acls_ip_rules         = []
+
 # PostgreSQL Configuration - Staging Environment
 postgresql_version               = "16"
 postgresql_admin_username        = "walletwatch_admin"

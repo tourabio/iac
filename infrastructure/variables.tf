@@ -164,3 +164,128 @@ variable "postgresql_availability_zone" {
   type        = string
   default     = "1"
 }
+
+# ACR Variables
+variable "acr_sku" {
+  description = "SKU for the Azure Container Registry"
+  type        = string
+  default     = "Basic"
+  validation {
+    condition     = contains(["Basic", "Standard", "Premium"], var.acr_sku)
+    error_message = "ACR SKU must be Basic, Standard, or Premium."
+  }
+}
+
+variable "acr_admin_enabled" {
+  description = "Enable admin user for the ACR"
+  type        = bool
+  default     = false
+}
+
+variable "acr_georeplications" {
+  description = "List of georeplications for the ACR (Premium SKU only)"
+  type = list(object({
+    location                = string
+    zone_redundancy_enabled = bool
+  }))
+  default = []
+}
+
+variable "acr_network_rule_set_enabled" {
+  description = "Enable network rule set for the ACR"
+  type        = bool
+  default     = false
+}
+
+variable "acr_network_rule_default_action" {
+  description = "Default action for ACR network rule set"
+  type        = string
+  default     = "Allow"
+  validation {
+    condition     = contains(["Allow", "Deny"], var.acr_network_rule_default_action)
+    error_message = "Default action must be Allow or Deny."
+  }
+}
+
+variable "acr_network_rule_ip_ranges" {
+  description = "List of IP ranges to allow access to ACR"
+  type        = list(string)
+  default     = []
+}
+
+# Key Vault Variables
+variable "keyvault_sku_name" {
+  description = "SKU name for the Key Vault"
+  type        = string
+  default     = "standard"
+  validation {
+    condition     = contains(["standard", "premium"], var.keyvault_sku_name)
+    error_message = "Key Vault SKU name must be standard or premium."
+  }
+}
+
+variable "keyvault_enabled_for_disk_encryption" {
+  description = "Enable Key Vault for disk encryption"
+  type        = bool
+  default     = false
+}
+
+variable "keyvault_enabled_for_deployment" {
+  description = "Enable Key Vault for deployment"
+  type        = bool
+  default     = false
+}
+
+variable "keyvault_enabled_for_template_deployment" {
+  description = "Enable Key Vault for template deployment"
+  type        = bool
+  default     = false
+}
+
+variable "keyvault_enable_rbac_authorization" {
+  description = "Enable RBAC authorization for Key Vault"
+  type        = bool
+  default     = true
+}
+
+variable "keyvault_soft_delete_retention_days" {
+  description = "Number of days to retain soft deleted items in Key Vault"
+  type        = number
+  default     = 7
+  validation {
+    condition     = var.keyvault_soft_delete_retention_days >= 7 && var.keyvault_soft_delete_retention_days <= 90
+    error_message = "Soft delete retention days must be between 7 and 90."
+  }
+}
+
+variable "keyvault_purge_protection_enabled" {
+  description = "Enable purge protection for Key Vault"
+  type        = bool
+  default     = false
+}
+
+variable "keyvault_network_acls_default_action" {
+  description = "Default action for Key Vault network ACLs"
+  type        = string
+  default     = "Allow"
+  validation {
+    condition     = contains(["Allow", "Deny"], var.keyvault_network_acls_default_action)
+    error_message = "Default action must be Allow or Deny."
+  }
+}
+
+variable "keyvault_network_acls_bypass" {
+  description = "Bypass option for Key Vault network ACLs"
+  type        = string
+  default     = "AzureServices"
+  validation {
+    condition     = contains(["AzureServices", "None"], var.keyvault_network_acls_bypass)
+    error_message = "Bypass must be AzureServices or None."
+  }
+}
+
+variable "keyvault_network_acls_ip_rules" {
+  description = "List of IP rules for Key Vault network ACLs"
+  type        = list(string)
+  default     = []
+}

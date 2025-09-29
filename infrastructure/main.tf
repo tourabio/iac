@@ -96,6 +96,43 @@ module "public_dns" {
   aks_cluster_dependency = module.aks
 }
 
+# Azure Container Registry Module
+module "acr" {
+  source = "./modules/acr"
+
+  environment         = var.environment
+  resource_group_name = module.resource_group.name
+  location            = module.resource_group.location
+  sku                 = var.acr_sku
+  admin_enabled       = var.acr_admin_enabled
+  georeplications     = var.acr_georeplications
+  network_rule_set_enabled   = var.acr_network_rule_set_enabled
+  network_rule_default_action = var.acr_network_rule_default_action
+  network_rule_ip_ranges     = var.acr_network_rule_ip_ranges
+  tags                = local.common_tags
+}
+
+# Key Vault Module
+module "keyvault" {
+  source = "./modules/keyvault"
+
+  environment                    = var.environment
+  resource_group_name            = module.resource_group.name
+  location                       = module.resource_group.location
+  persistent_resource_group_name = var.persistent_resource_group_name
+  sku_name                       = var.keyvault_sku_name
+  enabled_for_disk_encryption     = var.keyvault_enabled_for_disk_encryption
+  enabled_for_deployment          = var.keyvault_enabled_for_deployment
+  enabled_for_template_deployment = var.keyvault_enabled_for_template_deployment
+  enable_rbac_authorization       = var.keyvault_enable_rbac_authorization
+  soft_delete_retention_days      = var.keyvault_soft_delete_retention_days
+  purge_protection_enabled        = var.keyvault_purge_protection_enabled
+  network_acls_default_action     = var.keyvault_network_acls_default_action
+  network_acls_bypass             = var.keyvault_network_acls_bypass
+  network_acls_ip_rules           = var.keyvault_network_acls_ip_rules
+  tags                            = local.common_tags
+}
+
 # PostgreSQL Flexible Server Module
 module "postgresql" {
   source = "./modules/postgresql"
@@ -118,7 +155,8 @@ module "keyvault_secrets" {
   source = "./modules/keyvault-secrets"
 
   environment                    = var.environment
-  persistent_resource_group_name = var.persistent_resource_group_name
+  resource_group_name            = module.resource_group.name
+  keyvault_id                    = module.keyvault.id
   database_host                  = module.postgresql.server_fqdn
   database_port                  = "5432"
   database_name                  = module.postgresql.database_name
@@ -126,5 +164,5 @@ module "keyvault_secrets" {
   database_password              = module.postgresql.admin_password
   tags                           = local.common_tags
 
-  depends_on = [module.postgresql]
+  depends_on = [module.postgresql, module.keyvault]
 }

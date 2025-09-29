@@ -17,15 +17,17 @@ This is a professionally structured Terraform-based Infrastructure as Code (IaC)
 
 1. **Modules**: Reusable Terraform modules in `infrastructure/modules/`
    - `aks/`: Azure Kubernetes Service module with auto-scaling and persistent identities
+   - `acr/`: Azure Container Registry module with environment-specific SKUs
+   - `keyvault/`: Key Vault module with RBAC authorization and access policies
    - `postgresql/`: PostgreSQL Flexible Server with environment-specific SKUs
    - `keyvault-secrets/`: Key Vault secrets management for database credentials
    - `public-dns/`: Free Azure domain management for external access
    - `dns/`, `domain/`: Additional DNS management capabilities
    - `resource-group/`: Azure Resource Group module
 2. **Environments**: Environment-specific configurations
-   - `dev/`: Development with single AKS node (auto-scaling 1-2), Basic PostgreSQL
-   - `staging/`: Staging with auto-scaling (1-2 nodes), Standard PostgreSQL
-   - `prod/`: Production with auto-scaling (1-3 nodes), Premium PostgreSQL
+   - `dev/`: Development with Basic ACR, standard Key Vault, single AKS node (auto-scaling 1-2), Basic PostgreSQL
+   - `staging/`: Staging with Standard ACR, standard Key Vault, auto-scaling (1-2 nodes), Standard PostgreSQL
+   - `prod/`: Production with Premium ACR, premium Key Vault with enhanced security, auto-scaling (1-3 nodes), Premium PostgreSQL
 3. **Main Configuration**: `infrastructure/main.tf` orchestrates modules with persistent resource groups
 4. **Workflows**: GitHub Actions for deployment, destruction, and scheduled cleanup
 
@@ -140,9 +142,11 @@ For each environment:
 │   └── learning.md
 ├── infrastructure/             # Terraform infrastructure code
 │   ├── modules/               # Reusable modules
+│   │   ├── acr/              # Azure Container Registry
 │   │   ├── aks/              # Azure Kubernetes Service
 │   │   ├── dns/              # DNS zone management
 │   │   ├── domain/           # Domain configuration
+│   │   ├── keyvault/         # Key Vault with RBAC authorization
 │   │   ├── keyvault-secrets/ # Key Vault secrets management
 │   │   ├── postgresql/       # PostgreSQL Flexible Server
 │   │   ├── public-dns/       # Public DNS with Azure domains
@@ -175,22 +179,23 @@ The infrastructure requires the following manually created resources:
 
 **For Each Environment (dev/staging/prod):**
 
-1. **Persistent Resource Group**: `walletwatch-<env>-persistent-rg` (contains identities, ACR, Key Vault)
-2. **Main Resource Group**: `walletwatch-<env>-rg` (contains AKS, PostgreSQL, compute resources - manually created but referenced by Terraform)
-3. **Kubelet Identity**: `walletwatch-<env>-aks-kubelet-identity` (for ACR access)
-4. **Control Plane Identity**: `walletwatch-<env>-aks-controlplane-identity` (for AKS management)
-5. **Azure Container Registry**: `walletwatch<env>acr` (manually created)
-6. **Key Vault**: `walletwatch-<env>-kv` (optional, for secrets management)
+1. **Persistent Resource Group**: `walletwatch-<env>-persistent-rg` (contains identities only)
+2. **Main Resource Group**: `walletwatch-<env>-rg` (contains all Terraform-managed resources: ACR, Key Vault, AKS, PostgreSQL)
+3. **Kubelet Identity**: `walletwatch-<env>-aks-kubelet-identity` (in persistent RG, for ACR and Key Vault access)
+4. **Control Plane Identity**: `walletwatch-<env>-aks-controlplane-identity` (in persistent RG, for AKS management)
+5. **Azure Container Registry**: `walletwatch<env>acr` (Terraform-managed in main RG)
+6. **Key Vault**: `walletwatch-<env>-kv` (Terraform-managed in main RG)
 
 ### Required Role Assignments (One-Time Setup)
 
 **Critical Role Assignments by Admin:**
-1. **Control Plane Identity → Kubelet Identity**: "Managed Identity Operator" role
+1. **Control Plane Identity → Kubelet Identity**: "Managed Identity Operator" role (on kubelet identity resource)
    - Enables AKS cluster creation with user-assigned identities
    - Required to solve CustomKubeletIdentityMissingPermissionError
-2. **Kubelet Identity → ACR**: "AcrPull" role (for container image access)
-3. **Kubelet Identity → Key Vault**: "Key Vault Secrets User" role (if using Key Vault)
-4. **AKS Cluster Identity → Resource Group**: "Network Contributor" role
+2. **Kubelet Identity → Main Resource Group**: "AcrPull" role (for container image access from ACR)
+3. **Kubelet Identity → Main Resource Group**: "Key Vault Secrets User" role (for reading database secrets)
+4. **Service Principal/User → Main Resource Group**: "Key Vault Secrets Officer" role (for managing secrets)
+5. **AKS Cluster Control Plane Identity → Main Resource Group**: "Network Contributor" role
    - Enables LoadBalancer services to access and assign Azure public IPs
    - Required for NGINX ingress controller external IP assignment
    - Prevents "AuthorizationFailed" errors when creating LoadBalancer services
@@ -211,41 +216,51 @@ az group create --name "walletwatch-prod-rg" --location "West Europe"
 
 **Step 2: Role Assignments (One-Time Per Environment)**
 ```bash
-# Grant control plane identity permission to manage kubelet identity
+# 1. Grant control plane identity permission to manage kubelet identity
 az role assignment create \
   --assignee <controlplane-identity-principal-id> \
   --role "Managed Identity Operator" \
-  --scope "/subscriptions/<SUBSCRIPTION_ID>/resourceGroups/walletwatch-<env>-persistent-rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/walletwatch-<env>-aks-kubelet-identity"
+  --scope "/subscriptions/<SUBSCRIPTION_ID>/resourceGroups/walletwatch-<env>-rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/walletwatch-<env>-aks-kubelet-identity"
 
-# Grant kubelet identity access to Key Vault
+# 2. Grant kubelet identity ACR access at resource group level
+az role assignment create \
+  --assignee <kubelet-identity-principal-id> \
+  --role "AcrPull" \
+  --scope "/subscriptions/<SUBSCRIPTION_ID>/resourceGroups/walletwatch-<env>-rg"
+
+# 3. Grant kubelet identity Key Vault access at resource group level
 az role assignment create \
   --assignee <kubelet-identity-principal-id> \
   --role "Key Vault Secrets User" \
-  --scope "/subscriptions/<SUBSCRIPTION_ID>/resourceGroups/walletwatch-<env>-persistent-rg/providers/Microsoft.KeyVault/vaults/walletwatch-<env>-kv"
+  --scope "/subscriptions/<SUBSCRIPTION_ID>/resourceGroups/walletwatch-<env>-rg"
 
-# CRITICAL: Grant AKS control plane identity Network Contributor role (ONE-TIME SETUP)
+# 4. Grant service principal Key Vault management access at resource group level
+az role assignment create \
+  --assignee <service-principal-id> \
+  --role "Key Vault Secrets Officer" \
+  --scope "/subscriptions/<SUBSCRIPTION_ID>/resourceGroups/walletwatch-<env>-rg"
+
+# 5. Grant user Key Vault management access at resource group level (optional)
+az role assignment create \
+  --assignee <user-principal-id> \
+  --role "Key Vault Secrets Officer" \
+  --scope "/subscriptions/<SUBSCRIPTION_ID>/resourceGroups/walletwatch-<env>-rg"
+
+# 6. CRITICAL: Grant AKS control plane identity Network Contributor role (ONE-TIME SETUP)
 az role assignment create \
   --assignee <controlplane-identity-principal-id> \
   --role "Network Contributor" \
   --scope "/subscriptions/<SUBSCRIPTION_ID>/resourceGroups/walletwatch-<env>-rg"
 ```
 
-**Development Environment Example:**
-```bash
-# Replace with your actual values for dev environment
-az role assignment create \
-  --assignee "fa229838-37ee-454c-a3f6-d9b14130d90a" \
-  --role "Network Contributor" \
-  --scope "/subscriptions/56637f11-5e83-404d-b6b3-04c7dab01412/resourceGroups/walletwatch-dev-rg"
-```
-
 ### Why This Architecture
 
-- **Persistence**: All role assignments survive terraform destroy/redeploy cycles
-- **Security**: Minimal permissions following principle of least privilege
+- **Cost Efficiency**: ACR and Key Vault in main RG can be destroyed/recreated with terraform destroy
+- **Persistence**: Identity role assignments survive terraform destroy/redeploy cycles
+- **Security**: Minimal permissions following principle of least privilege, RBAC at resource group level
 - **Separation**: Control plane and kubelet have distinct identities and roles
-- **Admin Control**: Critical resources managed outside of developer terraform state
-- **nginx-ingress Reliability**: Network Contributor role on persistent main resource groups ensures LoadBalancer services work immediately after deployment
+- **Terraform Management**: Maximum resources managed by Terraform for consistency
+- **nginx-ingress Reliability**: Network Contributor role on main resource groups ensures LoadBalancer services work immediately after deployment
 
 See detailed setup instructions in `docs/learning.md` - "AKS Control Plane Identity and Managed Identity Operator Permissions" section.
 

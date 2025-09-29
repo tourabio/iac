@@ -802,3 +802,244 @@ az role assignment list --assignee <controlplane-identity-principal-id>
 # Verify identity exists
 az identity show --name "<identity-name>" --resource-group "<persistent-rg>"
 ```
+
+## Infrastructure Architecture Refactoring for Cost Efficiency
+
+### Problem: High Cost of Persistent Resources
+
+**Initial Architecture Challenge:**
+- ACR and Key Vault were manually created in persistent resource groups
+- These resources remained running 24/7 even when not needed
+- Cost accumulated during development and testing phases
+- Terraform couldn't manage lifecycle of these critical resources
+
+**Cost Impact:**
+- ACR: Continuous billing even when clusters are stopped
+- Key Vault: Always-on pricing regardless of usage
+- Manual resource management overhead
+- Difficult to implement cost-saving schedules
+
+### Solution: Move ACR and Key Vault to Terraform-Managed Resource Groups
+
+**Architecture Evolution (December 2024):**
+
+**Before Refactoring:**
+```
+Persistent RG (walletwatch-dev-persistent-rg):
+├── Control Plane Identity (manual)
+├── Kubelet Identity (manual)
+├── ACR (manual) ← Always running, cost accumulating
+└── Key Vault (manual) ← Always running, cost accumulating
+
+Main RG (walletwatch-dev-rg):
+├── AKS (terraform)
+├── PostgreSQL (terraform)
+└── Other compute resources (terraform)
+```
+
+**After Refactoring:**
+```
+Persistent RG (walletwatch-dev-persistent-rg):
+├── Control Plane Identity (manual) ← Only identities remain
+└── Kubelet Identity (manual) ← Minimal cost
+
+Main RG (walletwatch-dev-rg):
+├── AKS (terraform)
+├── PostgreSQL (terraform)
+├── ACR (terraform) ← Now managed by terraform!
+├── Key Vault (terraform) ← Now managed by terraform!
+└── Other compute resources (terraform)
+```
+
+### Implementation Steps
+
+**Step 1: Create New Terraform Modules**
+
+1. **ACR Module** (`infrastructure/modules/acr/`):
+```hcl
+resource "azurerm_container_registry" "main" {
+  name                = "walletwatch${var.environment}acr"
+  resource_group_name = var.resource_group_name
+  location            = var.location
+  sku                 = var.sku
+  admin_enabled       = var.admin_enabled
+  # ... additional configuration
+}
+```
+
+2. **Key Vault Module** (`infrastructure/modules/keyvault/`):
+```hcl
+resource "azurerm_key_vault" "main" {
+  name                = "walletwatch-${var.environment}-kv"
+  location            = var.location
+  resource_group_name = var.resource_group_name
+  tenant_id           = data.azurerm_client_config.current.tenant_id
+  sku_name            = var.sku_name
+  enable_rbac_authorization = var.enable_rbac_authorization
+  # ... additional configuration
+}
+```
+
+**Step 2: Update Role Assignment Strategy**
+
+**Old Approach (Resource-Level Permissions):**
+```bash
+# Kubelet → ACR (specific resource)
+az role assignment create \
+  --assignee <kubelet-identity> \
+  --role "AcrPull" \
+  --scope "/subscriptions/<id>/resourceGroups/walletwatch-dev-persistent-rg/providers/Microsoft.ContainerRegistry/registries/walletwatch<env>acr"
+
+# Kubelet → Key Vault (specific resource)
+az role assignment create \
+  --assignee <kubelet-identity> \
+  --role "Key Vault Secrets User" \
+  --scope "/subscriptions/<id>/resourceGroups/walletwatch-dev-persistent-rg/providers/Microsoft.KeyVault/vaults/walletwatch-dev-kv"
+```
+
+**New Approach (Resource Group-Level Permissions):**
+```bash
+# Kubelet → Resource Group (covers all ACRs and Key Vaults)
+az role assignment create \
+  --assignee ea161ec0-3fb0-4d81-8323-3b969bd3cc28 \
+  --role "AcrPull" \
+  --scope "/subscriptions/56637f11-5e83-404d-b6b3-04c7dab01412/resourceGroups/walletwatch-dev-rg"
+
+az role assignment create \
+  --assignee ea161ec0-3fb0-4d81-8323-3b969bd3cc28 \
+  --role "Key Vault Secrets User" \
+  --scope "/subscriptions/56637f11-5e83-404d-b6b3-04c7dab01412/resourceGroups/walletwatch-dev-rg"
+
+# Service Principal → Resource Group (for managing secrets)
+az role assignment create \
+  --assignee c408673e-9548-47fa-b2ba-c15194d75375 \
+  --role "Key Vault Secrets Officer" \
+  --scope "/subscriptions/56637f11-5e83-404d-b6b3-04c7dab01412/resourceGroups/walletwatch-dev-rg"
+
+# User → Resource Group (for manual management)
+az role assignment create \
+  --assignee cf71b9f7-6567-4438-a705-e7ff9aa623ea \
+  --role "Key Vault Secrets Officer" \
+  --scope "/subscriptions/56637f11-5e83-404d-b6b3-04c7dab01412/resourceGroups/walletwatch-dev-rg"
+
+# CRITICAL: Control Plane → Kubelet Identity (still specific resource)
+az role assignment create \
+  --assignee fa229838-37ee-454c-a3f6-d9b14130d90a \
+  --role "Managed Identity Operator" \
+  --scope "/subscriptions/56637f11-5e83-404d-b6b3-04c7dab01412/resourceGroups/walletwatch-dev-rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/walletwatch-dev-aks-kubelet-identity"
+```
+
+**Step 3: Update Environment Configurations**
+
+Add ACR and Key Vault variables to environment configs:
+
+```hcl
+# Dev Environment (cost-optimized)
+acr_sku = "Basic"
+keyvault_sku_name = "standard"
+keyvault_enable_rbac_authorization = true
+keyvault_soft_delete_retention_days = 7
+keyvault_purge_protection_enabled = false
+
+# Production Environment (security-focused)
+acr_sku = "Premium"
+keyvault_sku_name = "premium"
+keyvault_enable_rbac_authorization = true
+keyvault_soft_delete_retention_days = 90
+keyvault_purge_protection_enabled = true
+keyvault_network_acls_default_action = "Deny"
+```
+
+**Step 4: Update Module Dependencies**
+
+```hcl
+# Key Vault Secrets now references Terraform-managed Key Vault
+module "keyvault_secrets" {
+  source = "./modules/keyvault-secrets"
+
+  environment         = var.environment
+  resource_group_name = module.resource_group.name
+  keyvault_id         = module.keyvault.id  # ← Changed from data source
+  # ... other configuration
+
+  depends_on = [module.postgresql, module.keyvault]
+}
+```
+
+### Cost Benefits Achieved
+
+**1. Terraform Destroy Saves Costs:**
+```bash
+# Before: Manual resources stay running 24/7
+terraform destroy  # Only destroys AKS/PostgreSQL, ACR/KV remain running
+
+# After: All resources destroyed together
+terraform destroy  # Destroys AKS/PostgreSQL/ACR/KeyVault = $0 overnight!
+```
+
+**2. Automated Cleanup with GitHub Actions:**
+```yaml
+# Scheduled cleanup saves costs automatically
+- name: Destroy Dev Environment
+  uses: ./.github/workflows/scheduled-destroy-infrastructure.yml
+  schedule:
+    - cron: '0 20 * * *'  # 8 PM UTC = automatic cost savings
+```
+
+**3. Environment-Specific Resource Sizing:**
+- **Dev**: Basic ACR ($5/month vs $20/month Standard)
+- **Staging**: Standard ACR for testing
+- **Production**: Premium ACR with georeplications only when needed
+
+### Security Maintained
+
+**Role Assignment Persistence:**
+- ✅ Identity role assignments survive terraform destroy/redeploy
+- ✅ Resource group-level permissions work for new resources
+- ✅ Principle of least privilege maintained
+- ✅ RBAC authorization enabled for Key Vault
+
+**Network Security Enhanced:**
+- **Dev**: Open access for development ease
+- **Production**: Network ACLs with IP restrictions
+- **Key Vault**: RBAC instead of access policies
+
+### Migration Process
+
+**For Existing Environments:**
+
+1. **Update role assignments** to resource group level (see commands above)
+2. **Import existing resources** into Terraform state:
+```bash
+# Import existing ACR
+terraform import module.acr.azurerm_container_registry.main /subscriptions/<id>/resourceGroups/walletwatch-dev-rg/providers/Microsoft.ContainerRegistry/registries/walletwatch<env>acr
+
+# Import existing Key Vault
+terraform import module.keyvault.azurerm_key_vault.main /subscriptions/<id>/resourceGroups/walletwatch-dev-rg/providers/Microsoft.KeyVault/vaults/walletwatch-dev-kv
+```
+3. **Apply Terraform** to bring resources under management
+4. **Test deployment** to ensure role assignments work correctly
+
+### Key Learnings
+
+**1. Resource Group-Level Permissions Scale Better:**
+- Single role assignment covers multiple resources
+- New resources automatically inherit permissions
+- Easier to manage across environments
+
+**2. Cost Efficiency vs Operational Complexity:**
+- Terraform-managed resources = better cost control
+- Trade-off: More complex import/migration process
+- Benefit: Automated cost savings through destroy/recreate cycles
+
+**3. Identity Persistence Strategy:**
+- Keep identities in persistent RG (low cost, high persistence value)
+- Move high-cost resources to Terraform management
+- Balance between automation and persistence
+
+**4. Environment-Specific Configuration:**
+- Dev: Cost-optimized, open access
+- Staging: Balanced cost and security
+- Production: Security-first, controlled access
+
+This refactoring demonstrates how Infrastructure as Code can evolve to meet changing business requirements while maintaining security and operational excellence.

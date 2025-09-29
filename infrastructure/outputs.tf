@@ -42,6 +42,38 @@ output "argocd_url" {
   value       = module.public_dns.argocd_url
 }
 
+# ACR Outputs
+output "acr_name" {
+  description = "Name of the Azure Container Registry"
+  value       = module.acr.name
+}
+
+output "acr_login_server" {
+  description = "Login server of the Azure Container Registry"
+  value       = module.acr.login_server
+}
+
+output "acr_id" {
+  description = "ID of the Azure Container Registry"
+  value       = module.acr.id
+}
+
+# Key Vault Outputs
+output "keyvault_name" {
+  description = "Name of the Key Vault"
+  value       = module.keyvault.name
+}
+
+output "keyvault_vault_uri" {
+  description = "URI of the Key Vault"
+  value       = module.keyvault.vault_uri
+}
+
+output "keyvault_id" {
+  description = "ID of the Key Vault"
+  value       = module.keyvault.id
+}
+
 # PostgreSQL Outputs
 output "postgresql_server_name" {
   description = "Name of the PostgreSQL Flexible Server"
@@ -62,9 +94,4 @@ output "postgresql_database_name" {
 output "keyvault_secret_names" {
   description = "Names of the database secrets stored in Key Vault"
   value       = module.keyvault_secrets.secret_names
-}
-
-output "keyvault_id" {
-  description = "ID of the Key Vault containing database secrets"
-  value       = module.keyvault_secrets.key_vault_id
 }

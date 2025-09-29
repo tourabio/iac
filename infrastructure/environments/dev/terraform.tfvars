@@ -17,6 +17,24 @@ aks_max_nodes           = 2
 # Persistent resources (pre-created by admin)
 persistent_resource_group_name = "walletwatch-dev-persistent-rg"
 
+# ACR Configuration - Dev Environment
+acr_sku                         = "Basic"              # Basic tier for dev
+acr_admin_enabled               = false                # Use managed identities
+acr_network_rule_set_enabled    = false               # Allow all traffic for dev
+acr_georeplications             = []                   # No georeplications for Basic SKU
+
+# Key Vault Configuration - Dev Environment
+keyvault_sku_name                      = "standard"   # Standard tier
+keyvault_enabled_for_disk_encryption   = false        # Not needed for dev
+keyvault_enabled_for_deployment        = false        # Not needed for dev
+keyvault_enabled_for_template_deployment = false      # Not needed for dev
+keyvault_enable_rbac_authorization     = true         # Use RBAC for access control
+keyvault_soft_delete_retention_days    = 7            # Minimum retention for dev
+keyvault_purge_protection_enabled      = false        # Not needed for dev
+keyvault_network_acls_default_action   = "Allow"      # Allow all traffic for dev
+keyvault_network_acls_bypass           = "AzureServices"
+keyvault_network_acls_ip_rules         = []
+
 # PostgreSQL Configuration - Dev Environment (cost-optimized)
 postgresql_version               = "16"
 postgresql_admin_username        = "walletwatch_admin"
