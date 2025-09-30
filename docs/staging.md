@@ -119,7 +119,7 @@ Replace the placeholders with the actual values collected in Step 3:
 az role assignment create \
   --assignee <controlplane-identity-principal-id> \
   --role "Managed Identity Operator" \
-  --scope "/subscriptions/SUBSCRIPTION_ID/resourceGroups/walletwatch-staging-rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/walletwatch-staging-aks-kubelet-identity"
+  --scope "/subscriptions/SUBSCRIPTION_ID/resourceGroups/walletwatch-staging-persistent-rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/walletwatch-staging-aks-kubelet-identity"
 
 # 2. Kubelet Identity → Resource Group (AcrPull)
 az role assignment create \
